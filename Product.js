@@ -3,10 +3,6 @@ import { TextInput as MaterialTextInput, Button, Dialog, Portal, Provider as Pap
 import { Text, View, StyleSheet } from 'react-native';
 import { styleConstants } from "./Styles"
 import DropDownPicker from 'react-native-dropdown-picker';
-// import { Icon, MD3Colors } from 'react-native-paper';
-// import Icon from 'react-native-vector-icons/FontAwesome';
-import Icon from '@mdi/react';
-import { mdiPlusBox } from '@mdi/js';
 
 const Product = () => {
     const [visible, setVisible] = useState(false);
@@ -47,14 +43,11 @@ const Product = () => {
         <PaperProvider>
         <View style={{ flex: 1 }}>
             <Text style={styles.MainText}>CATEGORY -- PRODUCT</Text>
-            <View style={{ display: "flex" }}>
+            <View style={{flexDirection: 'row' }}>
                 <DropDownPicker open={open} value={value} items={items} setOpen={setOpen} setValue={setValue} setItems={setItems} placeholder="Select Category" style={styles.dropdown} />
-                {/* <Icon source="camera" color={MD3Colors.error50} size={20} onPress={onDialogOpen} /> */}
-                
-                {/* <Icon name="home" size={30} color="#900" /> */}
-                <Icon path={mdiPlusBox} size={1} />
-                {/* <Button onPress={onDialogOpen}>Click</Button> */}
+
             </View>
+                <Button onPress={onDialogOpen} >ADD</Button>
             <MaterialTextInput placeholder="Enter Product/Item Name" style={styles.textInput} value={product} mode="outlined" label="Product" onChangeText={handleProductChange} />
 
             <View style={styles.Buttoncontainer}>

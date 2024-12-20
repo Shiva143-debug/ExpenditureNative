@@ -43,17 +43,17 @@ const Source = () => {
     // const onSourceSubmit=()=>{
     //     const values = {id:1,source: sourceName, amount, date}
     //     axios.post("https://exciting-spice-armadillo.glitch.me/addSource", values)
-    //     .then(res => {
-    //         console.log(res.data);
-    //         // Toast.show({type: 'success',text1: 'Success',text2: 'Source of Income added successfully!',});
-    //         setSourceName('');
-    //         setAmount('');
-    //         setDate('');
-    //       })
-    //       .catch(err => {
-    //         console.error(err);
-    //         // Toast.show({type: 'error',text1: 'Error',text2: 'Failed to add Source of Income.',})
-    //     });
+        // .then(res => {
+        //     console.log(res.data);
+        //     // Toast.show({type: 'success',text1: 'Success',text2: 'Source of Income added successfully!',});
+        //     setSourceName('');
+        //     setAmount('');
+        //     setDate('');
+        //   })
+        //   .catch(err => {
+        //     console.error(err);
+        //     // Toast.show({type: 'error',text1: 'Error',text2: 'Failed to add Source of Income.',})
+        // });
     // }
 
     const onSourceSubmit = () => {
