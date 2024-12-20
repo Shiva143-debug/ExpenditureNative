@@ -1,0 +1,3 @@
+sdk.dir=C:\Users\wstte\AppData\Local\Android\Sdk
+
+ndk.dir=C:\Users\wstte\AppData\Local\Android\Sdk\ndk\28.0.12674087
