@@ -283,18 +283,31 @@ const Expence = () => {
         setSourceValue(null);
     };
     
- const onSetCategoryValue=(categoryValue)=>{
-    setCategoryValue(categoryValue)
-    fetchProducts(categoryValue)
+
+    const fetchProducts = (selectedCategory) => {
+        const userId = 1;
+        fetch(`https://exciting-spice-armadillo.glitch.me/products?category=FOOD&user_id=${userId}`)
+            .then(res => res.json())
+            // .then(data => setProductData(data))
+            .then(data => {
+                // Transform the data to the format DropDownPicker expects
+                const transformedData = data.map(item => ({
+                    label: item.product, // Adjust key to your API's product name field
+                    value: item.id,         // Adjust key to your API's product ID field
+                    key: item.id
+                }));
+                setProductData(transformedData);
+            })
+            .catch(err => console.log(err));
+    };
+
+ const onSetCategoryValue=(value)=>{
+    console.log("Selected Category:", value); 
+    setCategoryValue(value)
+    fetchProducts(value)
  }
 
- const fetchProducts = (category) => {
-    const userId = 1;
-    fetch(`https://exciting-spice-armadillo.glitch.me/products?category=${category}&user_id=${userId}`)
-        .then(res => res.json())
-        .then(data => setProductData(data))
-        .catch(err => console.log(err));
-};
+
     return (
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
 

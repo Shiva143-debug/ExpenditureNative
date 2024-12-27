@@ -10,4 +10,4 @@ import Source from './Source';
 import Product from "./Product"
 import Expence from './Expence';
 
-AppRegistry.registerComponent(appName, () => Expence);
+AppRegistry.registerComponent(appName, () => App);
