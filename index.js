@@ -11,5 +11,6 @@ import Product from "./Product"
 import Expence from './Expence';
 import Reports from './Reports';
 import Register from './Register';
+import Login from './Login';
 
-AppRegistry.registerComponent(appName, () => Register);
+AppRegistry.registerComponent(appName, () => Login);
