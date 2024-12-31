@@ -9,5 +9,7 @@ import Home from './Home';
 import Source from './Source';
 import Product from "./Product"
 import Expence from './Expence';
+import Reports from './Reports';
+import Register from './Register';
 
-AppRegistry.registerComponent(appName, () => App);
+AppRegistry.registerComponent(appName, () => Register);

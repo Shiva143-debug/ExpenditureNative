@@ -71,7 +71,7 @@ const ExpenceReport = () => {
                     <DataTable.Title >PRODUCT</DataTable.Title>
                     <DataTable.Title >COST</DataTable.Title>
                     <DataTable.Title >DATE</DataTable.Title>
-                    <DataTable.Title numeric>TAX AMOUNT</DataTable.Title>
+                    <DataTable.Title >TAX AMOUNT</DataTable.Title>
                 </DataTable.Header>
 
                 {items.slice(from, to).map((item) => (

@@ -27,14 +27,14 @@ const SourceReport = () => {
     <DataTable>
       <DataTable.Header>
         <DataTable.Title>SOURCE</DataTable.Title>
-        <DataTable.Title numeric>AMOUNT</DataTable.Title>
+        <DataTable.Title >AMOUNT</DataTable.Title>
         <DataTable.Title >DATE</DataTable.Title>
       </DataTable.Header>
 
       {items.slice(from, to).map((item) => (
         <DataTable.Row key={item.id}>
           <DataTable.Cell>{item.source}</DataTable.Cell>
-          <DataTable.Cell numeric>{item.amount}</DataTable.Cell>
+          <DataTable.Cell >{item.amount}</DataTable.Cell>
           <DataTable.Cell>{item.date}</DataTable.Cell>
         </DataTable.Row>
       ))}

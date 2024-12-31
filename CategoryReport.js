@@ -26,13 +26,13 @@ const CategoryReport = () => {
   return (
     <DataTable>
       <DataTable.Header>
-        <DataTable.Title numeric>ID</DataTable.Title>
+        <DataTable.Title >ID</DataTable.Title>
         <DataTable.Title >CATEGORY</DataTable.Title>
       </DataTable.Header>
 
       {items.slice(from, to).map((item) => (
         <DataTable.Row key={item.id}>
-          <DataTable.Cell numeric>{item.id}</DataTable.Cell>
+          <DataTable.Cell >{item.id}</DataTable.Cell>
           <DataTable.Cell>{item.category}</DataTable.Cell>
         </DataTable.Row>
       ))}
