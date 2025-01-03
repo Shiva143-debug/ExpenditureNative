@@ -12,5 +12,7 @@ import Expence from './Expence';
 import Reports from './Reports';
 import Register from './Register';
 import Login from './Login';
+import Dashboard from './Dashboard';
+import CustomDropdown from './CustomDropdown';
 
-AppRegistry.registerComponent(appName, () => Login);
+AppRegistry.registerComponent(appName, () => App);

@@ -1,48 +1,70 @@
-import * as React from 'react';
-import { DataTable } from 'react-native-paper';
-import { useEffect } from "react";
+
+
+import React, { useEffect, useState } from 'react';
+import { FlatList, View, Text, StyleSheet } from 'react-native';
+import { useAuth } from './AuthContext';
 
 const SourceReport = () => {
-  const [page, setPage] = React.useState(0);
-  const [numberOfItemsPerPageList] = React.useState([2, 3, 4,8]);
-  const [itemsPerPage, onItemsPerPageChange] = React.useState(8);
-  const [items, setSourceData] = React.useState([])
+  const { id } = useAuth();
+  const [sourceData, setSourceData] = React.useState([])
 
   useEffect(() => {
-    const userId = 1;
+    const userId = id;
     fetch(`https://exciting-spice-armadillo.glitch.me/getSourceData/${userId}`)
       .then(res => res.json())
       .then(data => setSourceData(data))
-      .catch(err => console.log(err))
-  }, [1]);
+      .catch(err => console.log(err));
+  }, [id]);
 
-  const from = page * itemsPerPage;
-  const to = Math.min((page + 1) * itemsPerPage, items.length);
-
-  React.useEffect(() => {
-    setPage(0);
-  }, [itemsPerPage]);
+  const renderSourceCard = ({ item }) => (
+    <View style={styles.card}>
+      <Text style={styles.title}>Source: {item.source}</Text>
+      <View style={{ display: "flex", flexDirection:"row" }}>
+        <Text style={{ flex: 1 }}>Amount: {item.amount}</Text>
+        <Text style={{ flex: 1, textAlign: "right" }}>Date: {item.date}</Text>
+      </View>
+    </View>
+  );
 
   return (
-    <DataTable>
-      <DataTable.Header>
-        <DataTable.Title>SOURCE</DataTable.Title>
-        <DataTable.Title >AMOUNT</DataTable.Title>
-        <DataTable.Title >DATE</DataTable.Title>
-      </DataTable.Header>
-
-      {items.slice(from, to).map((item) => (
-        <DataTable.Row key={item.id}>
-          <DataTable.Cell>{item.source}</DataTable.Cell>
-          <DataTable.Cell >{item.amount}</DataTable.Cell>
-          <DataTable.Cell>{item.date}</DataTable.Cell>
-        </DataTable.Row>
-      ))}
-
-      <DataTable.Pagination page={page} numberOfPages={Math.ceil(items.length / itemsPerPage)} onPageChange={(page) => setPage(page)} label={`${from + 1}-${to} of ${items.length}`} numberOfItemsPerPageList={numberOfItemsPerPageList}
-        numberOfItemsPerPage={itemsPerPage} onItemsPerPageChange={onItemsPerPageChange} showFastPaginationControls selectPageDropdownLabel={'Rows per page'}/>
-    </DataTable>
+    <FlatList
+      data={sourceData}
+      renderItem={renderSourceCard}
+      keyExtractor={(item) => item.id.toString()}
+      contentContainerStyle={styles.container}
+    />
   );
 };
 
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    marginBottom: 12,
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  category: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 2,
+  },
+  product: {
+    fontSize: 14,
+    color: '#333',
+  },
+});
+
 export default SourceReport;
+

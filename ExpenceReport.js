@@ -1,110 +1,126 @@
-import * as React from 'react';
-import { DataTable, } from 'react-native-paper';
-import { View, StyleSheet } from 'react-native';
-import { useEffect, useState } from "react";
-import { Picker } from '@react-native-picker/picker';
-
-
+import React, { useEffect, useState } from 'react';
+import { FlatList, View, Text, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import DropDownPicker from 'react-native-dropdown-picker';
+import { useNavigation } from "@react-navigation/native";
+import { useAuth } from './AuthContext';
 
 const ExpenceReport = () => {
-    const months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-    ];
+    const { id } = useAuth();
+    const navigation = useNavigation();
+    const [expenceData, setExpenceData] = React.useState([])
 
-    const years = Array.from({ length: 20 }, (_, i) => 2000 + i);
+    const [openMonth, setOpenMonth] = useState(false);
+    const [Month, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
+    const [months, setMonths] = useState([
+        { label: 'January', value: '1' },
+        { label: 'February', value: '2' },
+        { label: 'March', value: '3' },
+        { label: 'April', value: '4' },
+        { label: 'May', value: '5' },
+        { label: 'June', value: '6' },
+        { label: 'July', value: '7' },
+        { label: 'August', value: '8' },
+        { label: 'September', value: '9' },
+        { label: 'October', value: '10' },
+        { label: 'November', value: '11' },
+        { label: 'December', value: '12' },
+    ]);
 
-    const [selectedMonth, setSelectedMonth] = useState('');
-    const [selectedYear, setSelectedYear] = useState('');
-    const [page, setPage] = React.useState(0);
-    const [numberOfItemsPerPageList] = React.useState([2, 3, 4, 8]);
-    const [itemsPerPage, onItemsPerPageChange] = React.useState(8);
-    const [items, setExpenceData] = React.useState([])
+    const [openYear, setOpenYear] = useState(false);
+    const [Year, setSelectedYear] = useState(new Date().getFullYear().toString());
+    const [years, setYears] = useState([
+        { label: '2023', value: '2023' },
+        { label: '2024', value: '2024' },
+        { label: '2025', value: '2025' },
+    ]);
 
     useEffect(() => {
-        const userId = 1;
+        const userId = id;
         fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${userId}`)
             .then(res => res.json())
             .then(data => setExpenceData(data))
-            .catch(err => console.log(err))
-    }, [1]);
+            .catch(err => console.log(err));
+    }, [id]);
 
-    const from = page * itemsPerPage;
-    const to = Math.min((page + 1) * itemsPerPage, items.length);
-
-    React.useEffect(() => {
-        setPage(0);
-    }, [itemsPerPage]);
+    const filteredTotalCostData = expenceData.filter(
+        (d) => d.month.toString() === Month && d.year.toString() === Year
+    );
 
 
+    const onProductDetail=(item)=>{
+       console.log(item.id)
+       let itemId = item.id
+       navigation.navigate('ProductDetail', { id, itemId });
+    }
 
-    const handleSelectChange = (name, value) => {
-        if (name === 'month') {
-            setSelectedMonth(value);
-        } else if (name === 'year') {
-            setSelectedYear(value);
-        }
-    };
+    const renderExpenceCard = ({ item }) => (
+        <View style={styles.card}>
+            <Text style={styles.title}>Expence: {item.product}</Text>
+            <View style={{ display: "flex", flexDirection: "row" }}>
+                <Text style={{ flex: 1 }}>Category: {item.category}</Text>
+                <Icon name="arrow-forward" size={25} onPress={()=>onProductDetail(item)}/>
+            </View>
+            <View style={{ display: "flex", flexDirection: "row" }}>
+                <Text style={{ flex: 1 }}>Cost: {item.cost}</Text>
+                <Text style={{ flex: 1, textAlign: "right" }}>Date: {item.p_date}</Text>
+            </View>
+        </View>
+    );
 
     return (
-
         <View>
-            {/* <View style={styles.container}>
-                <Picker selectedValue={selectedMonth} onValueChange={(value) => handleSelectChange('month', value)} style={styles.picker}>
-                    <Picker.Item label="Select Month" value="" />
-                    {months.map((month, index) => (
-                        <Picker.Item key={index} label={month} value={index + 1} />
-                    ))}
-                </Picker>
+            <View style={styles.dropdownContainer}>
+                {!openYear && (
+                    <DropDownPicker open={openMonth} value={Month} items={months} setValue={setSelectedMonth} setItems={setMonths} placeholder="Select Month" style={styles.dropdown} dropDownContainerStyle={styles.dropdownList} listMode="SCROLLVIEW"
+                        setOpen={(isOpen) => {
+                            setOpenMonth(isOpen);
+                            if (isOpen) setOpenYear(false);
+                        }}
+                    />
+                )}
 
-                <Picker selectedValue={selectedYear} onValueChange={(value) => handleSelectChange('year', value)} style={styles.picker} >
-                    <Picker.Item label="Select Year" value="" />
-                    {years.map((year, index) => (
-                        <Picker.Item key={index} label={year.toString()} value={year} />
-                    ))}
-                </Picker>
-            </View> */}
-
-            <DataTable>
-                <DataTable.Header>
-                    <DataTable.Title >CATEGORY</DataTable.Title>
-                    <DataTable.Title >PRODUCT</DataTable.Title>
-                    <DataTable.Title >COST</DataTable.Title>
-                    <DataTable.Title >DATE</DataTable.Title>
-                    <DataTable.Title >TAX AMOUNT</DataTable.Title>
-                </DataTable.Header>
-
-                {items.slice(from, to).map((item) => (
-                    <DataTable.Row key={item.id} onPress={() => console.log("row clicked", item.id)}>
-                        <DataTable.Cell >{item.category}</DataTable.Cell>
-                        <DataTable.Cell >{item.product}</DataTable.Cell>
-                        <DataTable.Cell >{item.cost}</DataTable.Cell>
-                        <DataTable.Cell >{item.p_date}</DataTable.Cell>
-                        <DataTable.Cell numeric>{item.tax_amount}</DataTable.Cell>
-                    </DataTable.Row>
-                ))}
-
-                <DataTable.Pagination page={page} numberOfPages={Math.ceil(items.length / itemsPerPage)} onPageChange={(page) => setPage(page)} label={`${from + 1}-${to} of ${items.length}`} numberOfItemsPerPageList={numberOfItemsPerPageList}
-                    numberOfItemsPerPage={itemsPerPage} onItemsPerPageChange={onItemsPerPageChange} showFastPaginationControls selectPageDropdownLabel={'Rows per page'} />
-            </DataTable>
+                {!openMonth && (
+                    <DropDownPicker open={openYear} value={Year} items={years} setValue={setSelectedYear} setItems={setYears} placeholder="Select Year" style={styles.dropdown} dropDownContainerStyle={styles.dropdownList} listMode="SCROLLVIEW"
+                        setOpen={(isOpen) => {
+                            setOpenYear(isOpen);
+                            if (isOpen) setOpenMonth(false);
+                        }} />
+                )}
+            </View>
+            <FlatList
+                data={filteredTotalCostData}
+                renderItem={renderExpenceCard}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.container}
+            />
         </View>
     );
 };
 
-
 const styles = StyleSheet.create({
     container: {
-        flexDirection: 'row',
-        marginTop: 50,
+        padding: 16,
     },
-    picker: {
-        backgroundColor: 'transparent',
-        ...Platform.select({
-            android: {
-                marginTop: -10,
-            },
-        }),
+    card: {
+        backgroundColor: '#fff',
+        marginBottom: 12,
+        borderRadius: 8,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
+    title: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    dropdownContainer: { marginBottom: 20 },
+    dropdown: { borderColor: "#ccc", width: "90%", marginBottom: 10 },
+    dropdownList: { zIndex: 1, maxHeight: 800 },
 });
 
 export default ExpenceReport;
+

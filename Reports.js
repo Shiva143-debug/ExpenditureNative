@@ -1,7 +1,10 @@
 import { Text, View, StyleSheet, ScrollView } from 'react-native';
 import { Avatar, Button, Card } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const LeftContent = props => <Avatar.Icon {...props} icon="folder" />
+const LeftContent = props => (
+  <Avatar.Icon {...props} icon={() => <Icon name="assignment" size={16} color="white" />} />
+);
 
 const Reports = ({ navigation }) => {
 

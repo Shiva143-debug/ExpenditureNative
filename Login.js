@@ -3,9 +3,11 @@ import { View, Text, Image, Button, TouchableOpacity, StyleSheet, ActivityIndica
 import { TextInput } from 'react-native-paper';
 import axios from 'axios';
 import Toast from 'react-native-toast-message';
+import { useAuth } from './AuthContext';
 
 
-const Login = ({ setUserId }) => {
+const Login = ({ navigation }) => {
+    const { login } = useAuth();
     const [formData, setFormData] = useState({ loginEmail: '', password: '' });
     const [formErrors, setFormErrors] = useState({});
     const [touchedFields, setTouchedFields] = useState({});
@@ -32,15 +34,13 @@ const Login = ({ setUserId }) => {
     const handleSubmit = () => {
         if (validateForm()) {
             setLoading(true);
-            const loginData = { email: formData.loginEmail, password: formData.password };
+            const loginData = { loginEmail: formData.loginEmail, password: formData.password };
 
             axios.post('https://exciting-spice-armadillo.glitch.me/login', loginData)
                 .then(res => {
+                    console.log(res)
                     Toast.show({ type: 'success', position: 'top', text1: 'Success', text2: 'Login successfully' });
-                    setUserId(res.data.result.id);
-                    setTimeout(() => {
-                        navigation.navigate('DashBoard');
-                    }, 1000);
+                    login(res.data.result.id);
                 })
                 .catch(err => {
                     Toast.show({ type: 'error', position: 'top', text1: 'Error', text2: 'Invalid email or password' });
@@ -50,7 +50,7 @@ const Login = ({ setUserId }) => {
     };
 
     const handleSignupClick = () => {
-        // navigation.navigate('Register');
+        navigation.navigate('Register');
     };
 
     useEffect(() => {
@@ -67,19 +67,19 @@ const Login = ({ setUserId }) => {
                     <View>
                         <View style={styles.inputContainer}>
                             <TextInput mode="outlined" label="Email" style={styles.input} value={formData.loginEmail} onChangeText={(text) => handleChange('loginEmail', text)}
-                                onBlur={() => handleBlur('loginEmail')} error={touchedFields.loginEmail && formErrors.loginEmail} placeholder="Enter your email" keyboardType="email-address" right={<TextInput.Icon icon="email" />} />
+                                onBlur={() => handleBlur('loginEmail')} error={touchedFields.loginEmail && formErrors.loginEmail} placeholder="Enter your email " keyboardType="email-address"  />
                             {touchedFields.loginEmail && formErrors.loginEmail && <Text style={styles.errorText}>{formErrors.loginEmail}</Text>}
 
                             <TextInput mode="outlined" label="Password" style={styles.input} value={formData.password} onChangeText={(text) => handleChange('password', text)} onBlur={() => handleBlur('password')}
-                                error={touchedFields.password && formErrors.password} placeholder="Enter your password" secureTextEntry right={<TextInput.Icon icon="lock" />} />
+                                error={touchedFields.password && formErrors.password} placeholder="Enter your password" secureTextEntry  />
                             {touchedFields.password && formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
 
                             <Button title={loading ? 'Loading...' : 'Log In'} onPress={handleSubmit} disabled={loading} />
 
-                            <Text>Don't have an account?
-                                <TouchableOpacity onPress={handleSignupClick}>
+                            <Text style={styles.BottomText}>Don't have an account?
+                                <Text onPress={handleSignupClick}>
                                     <Text style={styles.signupText}> Register</Text>
-                                </TouchableOpacity>
+                                </Text>
                             </Text>
                         </View>
                     </View>
@@ -117,15 +117,18 @@ const styles = StyleSheet.create({
     errorText: {
         color: 'red',
         fontSize: 12,
+        paddingBottom:10
     },
     signupText: {
         color: 'blue',
-        paddingTop:10
     },
     inputContainer: {
         width: '100%',
         marginVertical: 10,
     },
+    BottomText:{
+        paddingTop:10
+    }
 });
 
 export default Login;
