@@ -19,7 +19,7 @@ const SourceReport = () => {
   const renderSourceCard = ({ item }) => (
     <View style={styles.card}>
       <Text style={styles.title}>Source: {item.source}</Text>
-      <View style={{ display: "flex", flexDirection:"row" }}>
+      <View style={{ display: "flex", flexDirection: "row" }}>
         <Text style={{ flex: 1 }}>Amount: {item.amount}</Text>
         <Text style={{ flex: 1, textAlign: "right" }}>Date: {item.date}</Text>
       </View>
@@ -54,15 +54,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
-  },
-  category: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 2,
-  },
-  product: {
-    fontSize: 14,
-    color: '#333',
   },
 });
 

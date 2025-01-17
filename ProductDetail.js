@@ -39,7 +39,7 @@ const ProductDetail = () => {
             {expenseData.image && (
                 <Image
                     source={{ uri: expenseData.image }}
-                    style={styles.image}e
+                    style={styles.image}
                 />
             )}
 
@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
+        
     },
     title: {
         fontSize: 18,
@@ -65,11 +66,11 @@ const styles = StyleSheet.create({
     },
     image: {
         width: '100%',
-        height: 200,
+        height: '80%',
         marginTop: 20,
         marginBottom: 8,
         borderRadius: 8,
-      },
+    },
 });
 
 export default ProductDetail

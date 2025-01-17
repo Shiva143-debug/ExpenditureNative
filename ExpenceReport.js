@@ -48,10 +48,10 @@ const ExpenceReport = () => {
     );
 
 
-    const onProductDetail=(item)=>{
-       console.log(item.id)
-       let itemId = item.id
-       navigation.navigate('ProductDetail', { id, itemId });
+    const onProductDetail = (item) => {
+        console.log(item.id)
+        let itemId = item.id
+        navigation.navigate('ProductDetail', { id, itemId });
     }
 
     const renderExpenceCard = ({ item }) => (
@@ -59,11 +59,16 @@ const ExpenceReport = () => {
             <Text style={styles.title}>Expence: {item.product}</Text>
             <View style={{ display: "flex", flexDirection: "row" }}>
                 <Text style={{ flex: 1 }}>Category: {item.category}</Text>
-                <Icon name="arrow-forward" size={25} onPress={()=>onProductDetail(item)}/>
+                <Icon name="arrow-forward" size={25} onPress={() => onProductDetail(item)} />
             </View>
             <View style={{ display: "flex", flexDirection: "row" }}>
                 <Text style={{ flex: 1 }}>Cost: {item.cost}</Text>
                 <Text style={{ flex: 1, textAlign: "right" }}>Date: {item.p_date}</Text>
+            </View>
+
+            <View style={{ display: "flex", flexDirection: "row" }}>
+                {item.is_tax_app !== "no" && <Text style={{ flex: 1 }}>Tax Percentage: {item.percentage}</Text>}
+                {item.is_tax_app !== "no" && <Text style={{ flex: 1, textAlign: "right" }}>Tax Amount: {item.tax_amount}</Text>}
             </View>
         </View>
     );

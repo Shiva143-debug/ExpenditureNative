@@ -19,7 +19,7 @@ const Reports = ({ navigation }) => {
   const GotoCategory = () => {
     navigation.navigate('CategoryReports');
   }
-  
+
   const GotoProduct = () => {
     navigation.navigate('ProductReports');
   }
@@ -63,9 +63,9 @@ const Reports = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 20, 
+    marginBottom: 20,
     marginHorizontal: 10,
-    borderRadius: 8, 
+    borderRadius: 8,
     elevation: 5,
   },
 });

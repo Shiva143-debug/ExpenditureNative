@@ -19,7 +19,7 @@ const ProductReport = () => {
           acc[product.category].push(product);
           return acc;
         }, {});
-        setProductsData(Object.entries(groupedData)); 
+        setProductsData(Object.entries(groupedData));
       })
       .catch(err => console.log(err));
   }, [id]);
@@ -43,7 +43,7 @@ const ProductReport = () => {
     <FlatList
       data={productsData}
       renderItem={renderCategoryCard}
-      keyExtractor={(item) => item[0]} 
+      keyExtractor={(item) => item[0]}
       contentContainerStyle={styles.container}
     />
   );

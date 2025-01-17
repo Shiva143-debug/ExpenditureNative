@@ -1,154 +1,8 @@
-
-// import React, { useState, useEffect } from 'react';
-// import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground } from 'react-native';
-// import { useRoute } from '@react-navigation/native';
-// import Icon from 'react-native-vector-icons/MaterialIcons';
-
-// const BalanceList = () => {
-//   const route = useRoute();
-//   const { id } = route.params;
-//   const [totalIncomeData, setTotalIncome] = useState([]);
-//  const [totalCostData, setExpenseCost] = useState([]);
-
-//  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-
-//   useEffect(() => {
-//     if (id) {
-//       fetch(`https://exciting-spice-armadillo.glitch.me/getSourceData/${id}`)
-//         .then((res) => res.json())
-//         .then((data) => setTotalIncome(Array.isArray(data) ? data : []))
-//         .catch((err) => console.log(err));
-
-//       fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${id}`)
-//         .then((res) => res.json())
-//         .then((data) => setExpenseCost(data))
-//         .catch((err) => console.log(err));
-//     }
-//   }, [id]);
-
-//   const combinedData = [...totalIncomeData, ...totalCostData];
-
-//   const groupedData = combinedData.reduce((acc, curr) => {
-//     const { month, year } = curr;
-//     const key = `${month}-${year}`;
-//     if (!acc[key]) {
-//       acc[key] = {
-//         month,
-//         year,
-//         income: 0,
-//         expenses: 0,
-//         balance: 0,
-//       };
-//     }
-//     if (curr.amount) {
-//       acc[key].income += parseFloat(curr.amount);
-//     }
-//     if (curr.cost) {
-//       acc[key].expenses += parseFloat(curr.cost);
-//     }
-//     acc[key].balance = acc[key].income - acc[key].expenses;
-//     return acc;
-//   }, {});
-
-//   const groupedArray = Object.values(groupedData);
-
-
-
-//   return (
-//     <View>
-//     <FlatList
-//       data={groupedArray}
-//       keyExtractor={(item) => item.income}
-//       renderItem={({ item }) => (
-//         <TouchableOpacity style={styles.card}>
-//           <ImageBackground
-//             source={{
-//               uri: 'https://res.cloudinary.com/dxgbxchqm/image/upload/v1721734044/black-white_iidqap.webp',
-//             }}
-//             style={styles.backgroundImage}
-//             imageStyle={{ borderRadius: 10 }}
-//           >
-//             <View style={styles.cardContent}>
-//                 <Text style={styles.cardTitle}>{item.month}</Text>
-//                 <Text style={styles.cardIncomeText}><Icon name="currency-rupee" size={16} /> {item.income}</Text>
-//                 <Text style={styles.cardExpenceText}><Icon name="currency-rupee" size={16} /> {item.expenses}</Text>
-//                 <Text style={styles.cardBalanceText}><Icon name="currency-rupee" size={16} /> {item.balance}</Text>
-//               </View>
-//           </ImageBackground>
-//         </TouchableOpacity>
-//       )}
-//     />
-//     </View>
-//   );
-// };
-
-// const styles = StyleSheet.create({
-//     container: {
-//       flex: 1,
-//       padding: 10,
-//     },
-
-//     flatList: {
-//       flex: 1,
-//     },
-
-//     card: {
-//       marginBottom: 15,
-//       borderRadius: 10, 
-//       overflow: 'hidden', 
-//       height:120
-//     },
-//     backgroundImage: {
-//       width: '100%',
-//       height: 120,
-//       justifyContent: 'flex-end',
-//     },
-
-
-//     cardTitle: {
-//       fontSize: 18,
-//       color: 'white',
-//       fontWeight: 'bold',
-//     },
-
-//     cardText: {
-//       fontSize: 16,
-//       color: 'white',
-//       marginTop: 5,
-//     },
-//     cardIncomeText:{
-//         fontSize: 16,
-//         color: 'blue',
-//         marginTop: 5,
-//     },
-//     cardExpenceText:{
-//         fontSize: 16,
-//         color: 'red',
-//         marginTop: 5,
-//     },
-//     cardBalanceText:{
-//         fontSize: 16,
-//         color: 'green',
-//         marginTop: 5,
-//     },
-//     icon: {
-//       marginLeft: 10
-//     },
-//   });
-
-
-// export default BalanceList;
-
-
-
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
 
 const BalanceList = () => {
     const route = useRoute();
@@ -204,9 +58,14 @@ const BalanceList = () => {
         }
     });
 
+    groupedArray.sort((a, b) => {
+        if (a.year !== b.year) {
+            return b.year - a.year;
+        }
+        return monthNames.indexOf(b.month) - monthNames.indexOf(a.month);
+    });
 
     const totalBalance = groupedArray.reduce((acc, curr) => acc + curr.balance, 0);
-    //   console.log(groupedArray)
 
     return (
         <View style={styles.container}>
@@ -234,7 +93,7 @@ const BalanceList = () => {
                                     income {item.income}
                                 </Text>
                                 <Text style={[styles.cardText, styles.cardExpenseText]}>
-                                    expence {item.expenses}
+                                    expence {Math.abs(item.expenses)}
                                 </Text>
                                 <Text style={[styles.cardText, styles.cardBalanceText]}>
                                     balance  {item.balance}
@@ -282,17 +141,14 @@ const styles = StyleSheet.create({
     cardIncomeText: {
         flex: 1,
         color: 'blue',
-        // textAlign: 'center',
     },
     cardExpenseText: {
         flex: 1,
         color: 'red',
-        // textAlign: 'center',
     },
     cardBalanceText: {
         flex: 1,
         color: 'green',
-        // textAlign: 'center',
     },
     totalBalanceContainer: {
         marginBottom: 10,

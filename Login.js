@@ -67,11 +67,11 @@ const Login = ({ navigation }) => {
                     <View>
                         <View style={styles.inputContainer}>
                             <TextInput mode="outlined" label="Email" style={styles.input} value={formData.loginEmail} onChangeText={(text) => handleChange('loginEmail', text)}
-                                onBlur={() => handleBlur('loginEmail')} error={touchedFields.loginEmail && formErrors.loginEmail} placeholder="Enter your email " keyboardType="email-address"  />
+                                onBlur={() => handleBlur('loginEmail')} error={touchedFields.loginEmail && formErrors.loginEmail} placeholder="Enter your email " keyboardType="email-address" />
                             {touchedFields.loginEmail && formErrors.loginEmail && <Text style={styles.errorText}>{formErrors.loginEmail}</Text>}
 
                             <TextInput mode="outlined" label="Password" style={styles.input} value={formData.password} onChangeText={(text) => handleChange('password', text)} onBlur={() => handleBlur('password')}
-                                error={touchedFields.password && formErrors.password} placeholder="Enter your password" secureTextEntry  />
+                                error={touchedFields.password && formErrors.password} placeholder="Enter your password" secureTextEntry />
                             {touchedFields.password && formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
 
                             <Button title={loading ? 'Loading...' : 'Log In'} onPress={handleSubmit} disabled={loading} />
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     errorText: {
         color: 'red',
         fontSize: 12,
-        paddingBottom:10
+        paddingBottom: 10
     },
     signupText: {
         color: 'blue',
@@ -126,8 +126,8 @@ const styles = StyleSheet.create({
         width: '100%',
         marginVertical: 10,
     },
-    BottomText:{
-        paddingTop:10
+    BottomText: {
+        paddingTop: 10
     }
 });
 

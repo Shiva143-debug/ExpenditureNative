@@ -49,15 +49,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  category: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 2,
-  },
-  product: {
-    fontSize: 14,
-    color: '#333',
-  },
 });
 
 export default CategoryReport;

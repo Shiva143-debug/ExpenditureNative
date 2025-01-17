@@ -48,12 +48,12 @@ const Register = ({ navigation }) => {
         .post("https://exciting-spice-armadillo.glitch.me/register", values)
         .then((res) => {
           console.log(res);
-          Toast.show({ type: 'success', position: 'top', text1: 'Success', text2: 'User Account Created successfully. Check your email for Password.'});
+          Toast.show({ type: 'success', position: 'top', text1: 'Success', text2: 'User Account Created successfully. Check your email for Password.' });
           navigation.navigate('Login');
         })
         .catch((err) => {
           console.log(err);
-          Toast.show({  type: 'error',  position: 'top',  text1: 'Error',  text2: 'Email already exists. Please use a different email address.', });
+          Toast.show({ type: 'error', position: 'top', text1: 'Error', text2: 'Email already exists. Please use a different email address.', });
         })
         .finally(() => setLoading(false));
     }
@@ -70,23 +70,23 @@ const Register = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Toast />
-      <Image source={{ uri: 'https://res.cloudinary.com/dxgbxchqm/image/upload/v1735649616/register_qziayq.jpg' }} style={styles.logo}/>
+      <Image source={{ uri: 'https://res.cloudinary.com/dxgbxchqm/image/upload/v1735649616/register_qziayq.jpg' }} style={styles.logo} />
       <Text style={styles.heading}>Register!!</Text>
       <View style={styles.formSection}>
         <View style={styles.inputContainer}>
-          <TextInput  mode="outlined" label="Full Name" style={styles.input} value={formData.fullName} placeholder="Enter Full Name" onChangeText={(text) => setFormData({ ...formData, fullName: text })} onBlur={() => handleBlur('fullName')}/>
+          <TextInput mode="outlined" label="Full Name" style={styles.input} value={formData.fullName} placeholder="Enter Full Name" onChangeText={(text) => setFormData({ ...formData, fullName: text })} onBlur={() => handleBlur('fullName')} />
           {touchedFields.fullName && formErrors.fullName && (<Text style={styles.errorText}>{formErrors.fullName}</Text>)}
-          
+
           <TextInput mode="outlined" label="Email" style={styles.input} value={formData.email} onChangeText={(text) => setFormData({ ...formData, email: text })} onBlur={() => handleBlur('email')} placeholder="Enter your email" keyboardType="email-address" />
           {touchedFields.email && formErrors.email && (<Text style={styles.errorText}>{formErrors.email}</Text>)}
 
-          <TextInput  mode="outlined"  label="Mobile Number"  style={styles.input}  value={formData.mobileNo}  onChangeText={(text) => setFormData({ ...formData, mobileNo: text })}  onBlur={() => handleBlur('mobileNo')} placeholder="Enter Mobile Number"  keyboardType="phone-pad" />
+          <TextInput mode="outlined" label="Mobile Number" style={styles.input} value={formData.mobileNo} onChangeText={(text) => setFormData({ ...formData, mobileNo: text })} onBlur={() => handleBlur('mobileNo')} placeholder="Enter Mobile Number" keyboardType="phone-pad" />
           {touchedFields.mobileNo && formErrors.mobileNo && (<Text style={styles.errorText}>{formErrors.mobileNo}</Text>)}
 
-          <TextInput mode="outlined" label="Address"style={styles.input} value={formData.address} onChangeText={(text) => setFormData({ ...formData, address: text })} onBlur={() => handleBlur('address')} placeholder="Enter Address" />
+          <TextInput mode="outlined" label="Address" style={styles.input} value={formData.address} onChangeText={(text) => setFormData({ ...formData, address: text })} onBlur={() => handleBlur('address')} placeholder="Enter Address" />
           {touchedFields.address && formErrors.address && (<Text style={styles.errorText}>{formErrors.address}</Text>)}
 
-          <Button title={loading ? 'Creating...' : 'Create your free account'} onPress={handleFormSubmit} disabled={loading}/>
+          <Button title={loading ? 'Creating...' : 'Create your free account'} onPress={handleFormSubmit} disabled={loading} />
           <Text style={styles.BottomText}> Already have an account?{' '}
             <Text onPress={signInClick}>
               <Text style={styles.signInText}>Sign In</Text>
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   },
   signInText: {
     color: 'blue',
-    paddingTop:10
+    paddingTop: 10
   },
   inputContainer: {
     width: '100%',
@@ -129,14 +129,14 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     fontSize: 12,
-    paddingBottom:10
+    paddingBottom: 10
   },
   logo: {
     width: '100%',
     height: '30%',
   },
-  BottomText:{
-    paddingTop:10
+  BottomText: {
+    paddingTop: 10
   }
 });
 
