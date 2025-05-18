@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet } from 'react-native';
+import { FlatList, View, Text, StyleSheet,TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from './AuthContext';
+import LoaderSpinner from './LoaderSpinner';
 
 const ExpenceReport = () => {
     const { id } = useAuth();
     const navigation = useNavigation();
     const [expenceData, setExpenceData] = React.useState([])
+    const [loading, setLoading] = useState(false);
+    const [showDropdowns, setShowDropdowns] = useState(false);
 
     const [openMonth, setOpenMonth] = useState(false);
     const [Month, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
@@ -37,10 +40,14 @@ const ExpenceReport = () => {
 
     useEffect(() => {
         const userId = id;
+        setLoading(true)
         fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${userId}`)
             .then(res => res.json())
             .then(data => setExpenceData(data))
-            .catch(err => console.log(err));
+            .catch(err => console.log(err))
+            .finally(() => {
+                setLoading(false); 
+              });
     }, [id]);
 
     const filteredTotalCostData = expenceData.filter(
@@ -73,11 +80,33 @@ const ExpenceReport = () => {
         </View>
     );
 
+
+    const handleMonthSelect = (value) => {
+        setSelectedMonth(value);
+        if (Year) {
+          setShowDropdowns(false);
+        }
+      };
+    
+      const handleYearSelect = (value) => {
+        setSelectedYear(value);
+        if (Month) {
+          setShowDropdowns(false);
+        }
+      };
+
     return (
-        <View>
+        <View style={styles.container}>
+            <LoaderSpinner shouldLoad={loading} />
+                    {!showDropdowns && (
+                      <TouchableOpacity onPress={() => setShowDropdowns(true)}>
+                        <Icon name="date-range" size={30} color="black" />
+                      </TouchableOpacity>
+                    )}
+                    {showDropdowns && (
             <View style={styles.dropdownContainer}>
                 {!openYear && (
-                    <DropDownPicker open={openMonth} value={Month} items={months} setValue={setSelectedMonth} setItems={setMonths} placeholder="Select Month" style={styles.dropdown} dropDownContainerStyle={styles.dropdownList} listMode="SCROLLVIEW"
+                    <DropDownPicker open={openMonth} value={Month} items={months} setValue={handleMonthSelect} setItems={setMonths} placeholder="Select Month" style={styles.dropdown} dropDownContainerStyle={styles.dropdownList} listMode="SCROLLVIEW"
                         setOpen={(isOpen) => {
                             setOpenMonth(isOpen);
                             if (isOpen) setOpenYear(false);
@@ -86,13 +115,14 @@ const ExpenceReport = () => {
                 )}
 
                 {!openMonth && (
-                    <DropDownPicker open={openYear} value={Year} items={years} setValue={setSelectedYear} setItems={setYears} placeholder="Select Year" style={styles.dropdown} dropDownContainerStyle={styles.dropdownList} listMode="SCROLLVIEW"
+                    <DropDownPicker open={openYear} value={Year} items={years} setValue={handleYearSelect} setItems={setYears} placeholder="Select Year" style={styles.dropdown} dropDownContainerStyle={styles.dropdownList} listMode="SCROLLVIEW"
                         setOpen={(isOpen) => {
                             setOpenYear(isOpen);
                             if (isOpen) setOpenMonth(false);
                         }} />
                 )}
             </View>
+                    )}
             <FlatList
                 data={filteredTotalCostData}
                 renderItem={renderExpenceCard}
@@ -105,13 +135,13 @@ const ExpenceReport = () => {
 
 const styles = StyleSheet.create({
     container: {
-        padding: 16,
+        padding: 10,
     },
     card: {
         backgroundColor: '#fff',
-        marginBottom: 12,
+        marginBottom: 20,
         borderRadius: 8,
-        padding: 16,
+        padding: 10,
         shadowColor: '#000',
         shadowOpacity: 0.1,
         shadowRadius: 4,

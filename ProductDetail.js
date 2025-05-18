@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRoute } from '@react-navigation/native';
 import { Image, View, Text, StyleSheet } from 'react-native';
+import LoaderSpinner from './LoaderSpinner';
 
 const ProductDetail = () => {
     const route = useRoute();
@@ -8,18 +9,24 @@ const ProductDetail = () => {
     console.log(id)
     console.log(itemId)
     const [expenseData, setExpenseData] = useState({});
+      const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        setLoading(true)
         fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCostByItemId/${id}/${itemId}`)
             .then((res) => res.json())
             .then((data) => setExpenseData(data))
-            .catch((err) => console.error(err));
+            .catch((err) => console.error(err))
+            .finally(() => {
+                setLoading(false); 
+              });
     }, [id, itemId]);
 
     console.log(expenseData)
 
     return (
         <View style={styles.card}>
+            <LoaderSpinner shouldLoad={loading} />
             <Text style={styles.title}>Expense: {expenseData.product}</Text>
             <View style={{ display: "flex", flexDirection: "row" }}>
                 <Text style={{ flex: 1 }}>Category: {expenseData.category}</Text>
@@ -52,7 +59,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#fff",
         margin: 16,
         borderRadius: 8,
-        padding: 16,
+        padding: 10,
         shadowColor: "#000",
         shadowOpacity: 0.1,
         shadowRadius: 4,

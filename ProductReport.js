@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, View, Text, StyleSheet } from 'react-native';
 import { useAuth } from './AuthContext';
+import LoaderSpinner from './LoaderSpinner';
 
 const ProductReport = () => {
   const { id } = useAuth();
   const [productsData, setProductsData] = useState({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const userId = id;
+    setLoading(true)
     fetch(`https://exciting-spice-armadillo.glitch.me/getCategoriesAndProducts/${userId}`)
       .then(res => res.json())
       .then(data => {
@@ -21,7 +24,10 @@ const ProductReport = () => {
         }, {});
         setProductsData(Object.entries(groupedData));
       })
-      .catch(err => console.log(err));
+      .catch(err => console.log(err))
+      .finally(() => {
+        setLoading(false); 
+      });
   }, [id]);
 
   const renderCategoryCard = ({ item }) => {
@@ -40,18 +46,21 @@ const ProductReport = () => {
   };
 
   return (
-    <FlatList
-      data={productsData}
-      renderItem={renderCategoryCard}
-      keyExtractor={(item) => item[0]}
-      contentContainerStyle={styles.container}
-    />
+    <View style={styles.container}>
+      <LoaderSpinner shouldLoad={loading} />
+      <FlatList
+        data={productsData}
+        renderItem={renderCategoryCard}
+        keyExtractor={(item) => item[0]}
+        contentContainerStyle={styles.container}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    padding: 10,
   },
   card: {
     backgroundColor: '#fff',

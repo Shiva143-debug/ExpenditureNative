@@ -3,18 +3,30 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, View, Text, StyleSheet } from 'react-native';
 import { useAuth } from './AuthContext';
+import LoaderSpinner from './LoaderSpinner';
 
 const SourceReport = () => {
   const { id } = useAuth();
   const [sourceData, setSourceData] = React.useState([])
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const userId = id;
-    fetch(`https://exciting-spice-armadillo.glitch.me/getSourceData/${userId}`)
+    if (!id) return; 
+    setLoading(true);
+    fetch(`https://exciting-spice-armadillo.glitch.me/getSourceData/${id}`)
       .then(res => res.json())
-      .then(data => setSourceData(data))
-      .catch(err => console.log(err));
-  }, [id]);
+      .then(data => {
+        setSourceData(data);
+      })
+      .catch(err => {
+        console.log(err); 
+        setLoading(false);
+      })
+      .finally(() => {
+        setLoading(false); 
+      });
+  }, [id]); 
+
 
   const renderSourceCard = ({ item }) => (
     <View style={styles.card}>
@@ -27,18 +39,21 @@ const SourceReport = () => {
   );
 
   return (
+    <View style={styles.container}>
+    <LoaderSpinner shouldLoad={loading} />
     <FlatList
       data={sourceData}
       renderItem={renderSourceCard}
       keyExtractor={(item) => item.id.toString()}
       contentContainerStyle={styles.container}
     />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    padding: 10,
   },
   card: {
     backgroundColor: '#fff',

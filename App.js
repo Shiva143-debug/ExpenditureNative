@@ -12,19 +12,21 @@ import ExpenceReport from './ExpenceReport';
 import ProductReport from './ProductReport';
 import SourceReport from './SourceReport';
 import Reports from './Reports';
-import Expence from "./Expence";
-import Source from "./Source";
-import Product from "./Product";
-import Dashboard from './Dashboard';
-import ItemReport from './ItemReport';
-import ExpensesList from './ExpensesList';
-import IncomeList from './IncomeList';
-import BalanceList from './BalanceList';
+// import Expence from "./Forms/Expence";
+// import Source from "./Forms/Source";
+// import Product from "./Product";
+import Dashboard from './DashboardScreens/Dashboard';
+import ItemReport from './DashboardScreens/Expences/ItemReport';
+import ExpensesList from './DashboardScreens/Expences/ExpensesList';
+
+import IncomeList from './DashboardScreens/IncomeList';
+import BalanceList from './DashboardScreens/BalanceList';
 import Add from './Add';
 import ProductDetail from './ProductDetail';
 import Header from './Header';
-import TaxAmountList from './TaxAmountList';
-import ExpenseByCategoryList from './ExpenseByCategoryList';
+import TaxAmountList from './DashboardScreens/TaxAmountList';
+import ExpenseByCategoryList from "./DashboardScreens/Expences/ExpenseByCategoryList";
+import { ThemeProvider } from './context/ThemeContext';
 
 
 const Tab = createBottomTabNavigator();
@@ -33,12 +35,12 @@ const Stack = createStackNavigator();
 const ReportsStack = () => {
   return (
     <Stack.Navigator>
-      <Stack.Screen name="ReportsHome" component={Reports} />
-      <Stack.Screen name="SourceReports" component={SourceReport} />
-      <Stack.Screen name="ExpenceReports" component={ExpenceReport} />
-      <Stack.Screen name="CategoryReports" component={CategoryReport} />
-      <Stack.Screen name="ProductReports" component={ProductReport} />
-      <Stack.Screen name="ProductDetail" component={ProductDetail} />
+      <Stack.Screen name="ReportsHome" component={Reports} options={{ headerShown: false }} />
+      <Stack.Screen name="SourceReports" component={SourceReport} options={{ headerShown: false }} />
+      <Stack.Screen name="ExpenceReports" component={ExpenceReport} options={{ headerShown: false }} />
+      <Stack.Screen name="CategoryReports" component={CategoryReport} options={{ headerShown: false }} />
+      <Stack.Screen name="ProductReports" component={ProductReport} options={{ headerShown: false }}  />
+      <Stack.Screen name="ProductDetail" component={ProductDetail} options={{ headerShown: false }}  />
     </Stack.Navigator>
   );
 };
@@ -46,13 +48,13 @@ const ReportsStack = () => {
 const DashboardStack = () => {
   return (
     <Stack.Navigator>
-      <Stack.Screen name="dashboardHome" component={Dashboard} />
-      <Stack.Screen name="ItemReport" component={ItemReport} />
-      <Stack.Screen name="ExpensesList" component={ExpensesList} />
-      <Stack.Screen name="IncomeList" component={IncomeList} />
-      <Stack.Screen name="BalanceList" component={BalanceList} />
-      <Stack.Screen name="TaxAmountList" component={TaxAmountList} />
-      <Stack.Screen name="ExpenseByCategoryList" component={ExpenseByCategoryList} />
+      <Stack.Screen name="dashboardHome" component={Dashboard} options={{ headerShown: false }}/>
+      <Stack.Screen name="ItemReport" component={ItemReport} options={{ headerShown: false }}/>
+      <Stack.Screen name="ExpensesList" component={ExpensesList} options={{ headerShown: false }}/>
+      <Stack.Screen name="IncomeList" component={IncomeList} options={{ headerShown: false }}/>
+      <Stack.Screen name="BalanceList" component={BalanceList} options={{ headerShown: false }}/>
+      <Stack.Screen name="TaxAmountList" component={TaxAmountList} options={{ headerShown: false }}/>
+      <Stack.Screen name="ExpenseByCategoryList" component={ExpenseByCategoryList} options={{ headerShown: false }}/>
     </Stack.Navigator>
   );
 };
@@ -85,12 +87,12 @@ const MainTabs = () => (
       },
     })}
   >
-    <Tab.Screen name="dashboard" component={DashboardStack} />
-    <Tab.Screen name="Add" component={Add} />
+    <Tab.Screen name="dashboard" component={DashboardStack}  options={{ headerShown: false }} />
+    <Tab.Screen name="Add" component={Add} options={{ headerShown: false,title:"ADD" }} />
     {/* <Tab.Screen name="Expence" component={Expence} />
     <Tab.Screen name="Source" component={Source} /> */}
     {/* <Tab.Screen name="Category" component={Product} /> */}
-    <Tab.Screen name="Reports" component={ReportsStack} />
+    <Tab.Screen name="Reports" component={ReportsStack} options={{ headerShown: false }} />
   </Tab.Navigator>
 );
 
@@ -119,11 +121,13 @@ const AppNavigator = () => {
 };
 
 const App = () => (
+  <ThemeProvider>
   <PaperProvider>
     <AuthProvider>
       <AppNavigator />
     </AuthProvider>
   </PaperProvider>
+  </ThemeProvider>
 );
 
 export default App;
