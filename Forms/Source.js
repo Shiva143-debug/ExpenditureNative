@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, Modal } from "react-native";
-import { Button } from "react-native-paper";
-import { styleConstants } from "../Styles";
 import { useAuth } from "../AuthContext";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import axios from "axios";
 import Toast from "react-native-toast-message";
 import DropDownPicker from 'react-native-dropdown-picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -12,6 +9,8 @@ import ThemedView from '../components/ThemedView';
 import ThemedText from '../components/ThemedText';
 import ThemedTextInput from '../components/ThemedTextInput';
 import LinearGradient from 'react-native-linear-gradient';
+import { getDefaultSources, addSource, addDefaultSource } from '../services/apiService';
+import LoaderSpinner from "../LoaderSpinner";
 
 const Source = () => {
   const { id } = useAuth();
@@ -30,6 +29,8 @@ const Source = () => {
 
   const handleSourceChange = (sourceName) => setSourceName(sourceName);
   const handleAmountChange = (amount) => setAmount(amount);
+  const [isAddingSource, setIsAddingSource] = useState(false);
+  const [isAddingSourceName, setIsAddingSourceName] = useState(false);
 
   const handleDateChange = (_, selectedDate) => {
     setShowDatePicker(false);
@@ -41,58 +42,62 @@ const Source = () => {
 
   useEffect(() => {
     if (!id) return;
-    
+
     const fetchSources = async () => {
       try {
-        const response = await axios.get(`https://exciting-spice-armadillo.glitch.me/getdefaultsources/${id}`);
-        const transformedData = response.data.map(item => ({
-          label: item.source_name,
-          value: item.source_name,
-          key: item.id.toString()
-        }));
-        setSourceData(transformedData);
+        const data = await getDefaultSources(id);
+        console.log(data);
+        if (data) {
+          const transformedData = data.map(item => ({
+            label: item.source_name,
+            value: item.source_name,
+            key: item.id.toString()
+          }));
+          setSourceData(transformedData);
+        }
+
       } catch (error) {
         console.error('Error fetching sources:', error);
-        Toast.show({type: "error", text1: "Error", text2: "Failed to fetch sources", position: "top"});
+        Toast.show({ type: "error", text1: "Error", text2: "Failed to fetch sources", position: "top" });
       }
     };
 
     fetchSources();
   }, [id, refreshFlag]);
 
-  const onSourceSubmit = () => {
+  const onSourceSubmit = async () => {
     // Validate required fields
     if (!sourceValue) {
-      Toast.show({type: "error", text1: "Validation Error", text2: "Please select a source", position: "top"});
+      Toast.show({ type: "error", text1: "Validation Error", text2: "Please select a source", position: "top" });
       return;
     }
 
-    if (!amount || amount.trim() === '') {
-      Toast.show({ type: "error", text1: "Validation Error", text2: "Please enter an amount", position: "top"});
+    else if (!amount || amount.trim() === '') {
+      Toast.show({ type: "error", text1: "Validation Error", text2: "Please enter an amount", position: "top" });
       return;
     }
 
-    if (!date) {
-      Toast.show({type: "error",text1: "Validation Error",text2: "Please select a date",position: "top"});
+    else if (!date) {
+      Toast.show({ type: "error", text1: "Validation Error", text2: "Please select a date", position: "top" });
       return;
     }
-
-    const values = { id: id, source: sourceValue, amount, date };
-    axios
-      .post("https://exciting-spice-armadillo.glitch.me/addSource", values)
-      .then((res) => {
-        console.log(res.data);
-        Toast.show({type: "success",text1: "Success",text2: "Source of Income added successfully!",position: "top",
-          visibilityTime: 3000,autoHide: true});
-        setSourceValue(null);
-        setAmount("");
-        setDate('');
-      })
-      .catch((err) => {
-        console.error(err);
-        Toast.show({type: "error",text1: "Error",text2: "Failed to add Source of Income. Please try again.",
-          position: "top",visibilityTime: 3000,autoHide: true});
+    try {
+      setIsAddingSource(true);
+      const sourceData = { id: id, source: sourceValue, amount, date };
+      await addSource(sourceData);
+      Toast.show({
+        type: "success", text1: "Success", text2: "Source added successfully", position: "top", visibilityTime: 3000, autoHide: true
       });
+
+    } catch (error) {
+      console.error('Error submitting Source:', error);
+      Toast.show({ type: "error", text1: "Error", text2: "Failed to add Source", position: "top" });
+    } finally {
+      setIsAddingSource(false);
+      setSourceValue("");
+      setAmount("");
+      setDate('');
+    }
   };
 
   const onDialogOpen = () => {
@@ -105,32 +110,34 @@ const Source = () => {
     setSourceName("")
   }
 
-  const handleSourceSubmit = () => {
+  const handleSourceSubmit = async () => {
     if (!sourceName) {
-      Toast.show({ type: "error", text1: "Validation Error", text2: "Please enter a source name", visibilityTime: 3000,autoHide: true});
+      Toast.show({ type: "error", text1: "Validation Error", text2: "Please enter a source name", visibilityTime: 3000, autoHide: true });
       return;
     }
-    let sourceData = { id, sourceName }
-    axios.post("https://exciting-spice-armadillo.glitch.me/adddefaultsource", sourceData)
-      .then(res => {
-        console.log(res);
-        Toast.show({ type: "success", text1: "Success", text2: "New source added successfully!", visibilityTime: 3000,autoHide: true,topOffset: 30});
-        setSourceName("")
-        hideDialog();
-        setRefreshFlag((prev) => !prev);
-      })
-      .catch(err => {
-        setSourceName("")
-        console.log(err);
-        Toast.show({ type: "error", text1: "Error", text2: "Failed to add new source. Please try again.", visibilityTime: 3000,
-          autoHide: true, topOffset: 30 });
+    try {
+      setIsAddingSourceName(true);
+      let sourceData = { id, sourceName }
+      await addDefaultSource(sourceData);
+      Toast.show({
+        type: "success", text1: "Success", text2: "Source Name added successfully", position: "top", visibilityTime: 3000, autoHide: true
       });
+      setRefreshFlag((prev) => !prev);
 
-    hideDialog();
+    } catch (error) {
+      console.error('Error submitting Source Name:', error);
+      Toast.show({ type: "error", text1: "Error", text2: "Failed to add Source Name", position: "top" });
+    } finally {
+      setIsAddingSourceName(false);
+      setSourceName("");
+      hideDialog();
+
+    }
   }
 
   return (
     <>
+      <LoaderSpinner shouldLoad={isAddingSource || isAddingSourceName} />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <ThemedView style={styles.container}>
           <ThemedView style={styles.formContainer}>
@@ -181,10 +188,10 @@ const Source = () => {
               <View style={styles.modalContainer}>
                 <ThemedView style={styles.modalContent}>
                   <ThemedText style={styles.modalTitle}>Add New Source</ThemedText>
-                  
+
                   <ThemedView style={styles.inputContainer}>
                     <ThemedText style={styles.modalLabel}>Source Name:</ThemedText>
-                    <ThemedTextInput placeholder="Enter Source Name" value={sourceName} onChangeText={handleSourceChange} style={styles.modalInput}/>
+                    <ThemedTextInput placeholder="Enter Source Name" value={sourceName} onChangeText={handleSourceChange} style={styles.modalInput} />
                   </ThemedView>
 
                   <View style={styles.modalButtonContainer}>
@@ -195,7 +202,7 @@ const Source = () => {
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleSourceSubmit} style={styles.modalButton}>
                       <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                        <ThemedText style={styles.buttonText}>Add Source</ThemedText>
+                        <ThemedText style={styles.buttonText}>Add </ThemedText>
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>

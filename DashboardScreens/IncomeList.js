@@ -7,6 +7,7 @@ import LoaderSpinner from '../LoaderSpinner';
 import ThemedView from '../components/ThemedView';
 import ThemedText from '../components/ThemedText';
 import LinearGradient from 'react-native-linear-gradient';
+import {getIncomeSources} from "../services/apiService"
 
 const IncomeList = () => {
   const route = useRoute();
@@ -24,10 +25,7 @@ const IncomeList = () => {
   const getMonthlyIncome = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `https://exciting-spice-armadillo.glitch.me/getSource/${id}/${Month}/${Year}`
-      );
-      const data = await response.json();
+      const data = await getIncomeSources(id,Month,Year);
       if (Array.isArray(data)) {
         setIncomeData(data);
       } else {

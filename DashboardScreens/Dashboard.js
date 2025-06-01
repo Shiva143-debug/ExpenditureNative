@@ -4,11 +4,11 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { useAuth } from '../AuthContext';
-import { Image } from 'react-native';
 import LoaderSpinner from "../LoaderSpinner";
 import LinearGradient from 'react-native-linear-gradient';
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
+import { getExpenseCosts, getIncomeSources } from "../services/apiService"
 
 const Dashboard = () => {
   const { id } = useAuth();
@@ -47,8 +47,7 @@ const Dashboard = () => {
   // Function to fetch expense data
   const getExpenses = async () => {
     try {
-      const response = await fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${id}`);
-      const data = await response.json();
+      const data = await getExpenseCosts(id);
       return data;
     } catch (error) {
       console.error('Error fetching expenses:', error);
@@ -59,8 +58,7 @@ const Dashboard = () => {
   // Function to fetch income data
   const getIncome = async () => {
     try {
-      const response = await fetch(`https://exciting-spice-armadillo.glitch.me/getSource/${id}/${Month}/${Year}`);
-      const data = await response.json();
+      const data = await getIncomeSources(id, Month, Year);
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error fetching income:', error);
@@ -93,8 +91,8 @@ const Dashboard = () => {
 
           // Filter expenses for current month and year
           const filteredExpenses = expenseResult.filter(
-            (expense) => expense.month.toString() === Month && 
-                        expense.year.toString() === Year
+            (expense) => expense.month.toString() === Month &&
+              expense.year.toString() === Year
           );
 
           // Update states
@@ -143,7 +141,11 @@ const Dashboard = () => {
   };
 
   const handlePressBalance = () => {
-    navigation.navigate('BalanceList', { id });
+    navigation.navigate('BalanceList');
+  };
+
+  const handlePressSavings = () => {
+    navigation.navigate('SavingsList');
   };
 
   const handlePressTax = () => {
@@ -161,13 +163,13 @@ const Dashboard = () => {
     <ThemedView style={styles.mainContainer}>
       <ScrollView style={styles.scrollView}>
         <LoaderSpinner shouldLoad={loading} />
-        
+
         {/* Header Section */}
         <ThemedView style={styles.headerSection}>
           <Text style={styles.greeting}>Financial Dashboard</Text>
-          
+
           {!showDropdowns ? (
-            <TouchableOpacity  style={styles.dateSelector}  onPress={() => setShowDropdowns(true)}>
+            <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDropdowns(true)}>
               <Icon name="event" size={24} color="#FFF" />
               <Text style={styles.dateText}>
                 {months.find((m) => m.value === Month)?.label} {Year}
@@ -184,7 +186,7 @@ const Dashboard = () => {
                   }}
                 />
               </View>
-              
+
               <View style={styles.dropdownBox}>
                 <DropDownPicker open={openYear} value={Year} items={years} setValue={handleYearSelect} setItems={setYears} placeholder="Year" style={styles.picker} dropDownContainerStyle={styles.dropdownList}
                   listMode="SCROLLVIEW" setOpen={(isOpen) => {
@@ -227,7 +229,7 @@ const Dashboard = () => {
         {/* Secondary Stats */}
         <ThemedView style={styles.secondaryStats}>
           <ThemedView style={styles.secondaryCard}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.secondaryCardContent,
                 { opacity: taxAmount > 0 ? 1 : 0.6 }
@@ -238,7 +240,7 @@ const Dashboard = () => {
               <View>
                 <ThemedText style={styles.secondaryLabel}>Tax Amount</ThemedText>
                 <ThemedText style={styles.secondaryValue}>₹{taxAmount.toLocaleString()}</ThemedText>
-               
+
               </View>
               {taxAmount > 0 && (
                 <Icon name="arrow-forward-ios" size={20} color="#1976D2" />
@@ -246,13 +248,13 @@ const Dashboard = () => {
             </TouchableOpacity>
           </ThemedView>
 
-          <ThemedView style={styles.secondaryCard} onPress={handlePressBalance}>
+          <ThemedView style={styles.secondaryCard} >
             <TouchableOpacity style={styles.secondaryCardContent}>
               <Icon name="account-balance-wallet" size={24} color="#1976D2" />
               <View>
                 <ThemedText style={styles.secondaryLabel}>Balance</ThemedText>
-                <ThemedText style={[styles.secondaryValue, 
-                  { color: (totalIncome - totalExpenses) < 0 ? '#D32F2F' : '#2E7D32' }]}>
+                <ThemedText style={[styles.secondaryValue,
+                { color: (totalIncome - totalExpenses) < 0 ? '#D32F2F' : '#2E7D32' }]}>
                   ₹{Math.abs(totalIncome - totalExpenses).toLocaleString()}
                 </ThemedText>
               </View>
@@ -263,7 +265,7 @@ const Dashboard = () => {
         {/* Quick Actions */}
         <ThemedView style={styles.quickActions}>
           <TouchableOpacity style={styles.actionCard} onPress={handlePressExpenceByCat}>
-            <LinearGradient colors={['#7B1FA2', '#4A148C']}style={styles.gradientAction}>
+            <LinearGradient colors={['#7B1FA2', '#4A148C']} style={styles.gradientAction}>
               <View style={styles.actionContent}>
                 <View style={styles.actionLeft}>
                   <Icon name="pie-chart" size={30} color="#FFF" />
@@ -274,8 +276,8 @@ const Dashboard = () => {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity  style={styles.actionCard}  onPress={handlePressBalance}>
-            <LinearGradient colors={['#1976D2', '#0D47A1']}style={styles.gradientAction}>
+          <TouchableOpacity style={styles.actionCard} onPress={handlePressBalance}>
+            <LinearGradient colors={['#1976D2', '#0D47A1']} style={styles.gradientAction}>
               <View style={styles.actionContent}>
                 <View style={styles.actionLeft}>
                   <Icon name="assessment" size={30} color="#FFF" />
@@ -285,6 +287,19 @@ const Dashboard = () => {
               </View>
             </LinearGradient>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={handlePressSavings}>
+            <LinearGradient colors={['lightgreen', 'green']} style={styles.gradientAction}>
+              <View style={styles.actionContent}>
+                <View style={styles.actionLeft}>
+                  <Icon name="payments" size={30} color="#FFF" />
+                  <Text style={styles.actionText}>Total Savings</Text>
+                </View>
+                <Icon name="arrow-forward-ios" size={20} color="#FFF" />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+
         </ThemedView>
       </ScrollView>
     </ThemedView>
@@ -337,7 +352,7 @@ const styles = StyleSheet.create({
   dropdownList: {
     borderWidth: 0,
     borderRadius: 8,
-    maxHeight:800
+    maxHeight: 800
   },
   statsContainer: {
     padding: 15,
@@ -367,7 +382,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   secondaryStats: {
-    padding: 15,
+    paddingHorizontal: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 15,

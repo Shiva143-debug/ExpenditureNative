@@ -7,6 +7,7 @@ import ThemedView from '../../components/ThemedView';
 import ThemedText from '../../components/ThemedText';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import { getExpenseCosts } from "../../services/apiService"
 
 const ExpenseByCategoryList = () => {
   const { id } = useAuth();
@@ -184,15 +185,10 @@ const ExpenseByCategoryList = () => {
   };
 
   const getExpensesByYear = async () => {
-    const userId = id;
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${userId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch expenses');
-      }
-      const data = await response.json();
+      const data = await getExpenseCosts(id);
       setExpenses(data);
     } catch (err) {
       setError(err.message);
@@ -271,13 +267,13 @@ const ExpenseByCategoryList = () => {
           <View style={styles.cardContent}>
 
 
-            <View style={{display:"flex",flexDirection:"row"}}>
+            <View style={{ display: "flex", flexDirection: "row" }}>
               <View style={styles.iconContainer}>
                 <Icon name={iconName} size={32} color="#FFF" />
               </View>
               <View>
-              <ThemedText style={styles.category}>{item.category}</ThemedText>
-              <ThemedText style={styles.amount}>₹{item.TotalCost.toLocaleString()}</ThemedText>
+                <ThemedText style={styles.category}>{item.category}</ThemedText>
+                <ThemedText style={styles.amount}>₹{item.TotalCost.toLocaleString()}</ThemedText>
               </View>
             </View>
 

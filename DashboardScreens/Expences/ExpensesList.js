@@ -8,6 +8,7 @@ import LoaderSpinner from '../../LoaderSpinner';
 import ThemedView from '../../components/ThemedView';
 import ThemedText from '../../components/ThemedText';
 import LinearGradient from 'react-native-linear-gradient';
+import {getExpenseCosts} from "../../services/apiService"
 
 const ExpensesList = () => {
   const route = useRoute();
@@ -182,8 +183,7 @@ const ExpensesList = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const response = await fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${id}`);
-      const data = await response.json();
+      const data = await getExpenseCosts(id);
       setExpensesData(data);
     } catch (error) {
       console.error('Error fetching expenses:', error);

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, StyleSheet } from 'react-native';
+import { FlatList, View, Text, StyleSheet, Alert } from 'react-native';
 import { useAuth } from './AuthContext';
 import LoaderSpinner from './LoaderSpinner';
+import { getCategoryReport } from './services/apiService';
 
 const CategoryReport = () => {
   const { id } = useAuth();
@@ -9,15 +10,22 @@ const CategoryReport = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const userId = id;
-    setLoading(true);
-    fetch(`https://exciting-spice-armadillo.glitch.me/getCategories/${userId}`)
-      .then(res => res.json())
-      .then(data => setCategoriesData(data))
-      .catch(err => console.log(err))
-      .finally(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        const data = await getCategoryReport(id);
+        setCategoriesData(data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        Alert.alert('Error', 'Failed to load categories');
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    
+    if (id) {
+      fetchCategories();
+    }
   }, [id]);
 
   const renderCategoryCard = ({ item }) => (

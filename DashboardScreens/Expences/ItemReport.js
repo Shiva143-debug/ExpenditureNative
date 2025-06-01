@@ -7,6 +7,7 @@ import ThemedView from '../../components/ThemedView';
 import ThemedText from '../../components/ThemedText';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import {getExpenseCosts} from "../../services/apiService"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -27,8 +28,7 @@ const ItemReport = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const response = await fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${id}`);
-      const data = await response.json();
+     const data = await getExpenseCosts(id);
       setExpenseItems(data);
     } catch (error) {
       console.error('Error fetching expense items:', error);

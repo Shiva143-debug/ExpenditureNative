@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, Button, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import axios from 'axios';
 import Toast from 'react-native-toast-message';
+import { registerUser } from "./services/apiService"
 
 const Register = ({ navigation }) => {
   const [formData, setFormData] = useState({ fullName: '', email: '', mobileNo: '', address: '' });
@@ -34,28 +34,29 @@ const Register = ({ navigation }) => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleFormSubmit = () => {
-    const values = {
+  const handleFormSubmit = async () => {
+
+    if (validateForm()) {
+          const values = {
       full_name: formData.fullName,
       email: formData.email,
       mobile_no: formData.mobileNo,
       address: formData.address,
     };
 
-    if (validateForm()) {
-      setLoading(true);
-      axios
-        .post("https://exciting-spice-armadillo.glitch.me/register", values)
-        .then((res) => {
-          console.log(res);
-          Toast.show({ type: 'success', position: 'top', text1: 'Success', text2: 'User Account Created successfully. Check your email for Password.' });
-          navigation.navigate('Login');
-        })
-        .catch((err) => {
-          console.log(err);
-          Toast.show({ type: 'error', position: 'top', text1: 'Error', text2: 'Email already exists. Please use a different email address.', });
-        })
-        .finally(() => setLoading(false));
+      try {
+        setLoading(true);
+        const data = await registerUser(values);
+        console.log("recieved response", data)
+        Toast.show({ type: 'success', position: 'top', text1: 'Success', text2: data.message });
+        navigation.navigate('Login');;
+      } catch (error) {
+        console.log(error);
+        Toast.show({ type: 'error', position: 'top', text1: 'Error', text2: data.message || "Something went wrong." });
+      } finally {
+        setLoading(false)
+      }
+
     }
   };
 

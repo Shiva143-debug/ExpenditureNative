@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Modal, Alert } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import axios from "axios";
 import { request, PERMISSIONS } from 'react-native-permissions';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -13,13 +12,13 @@ import ThemedTextAreaInput from '../components/ThemedTextAreaInput';
 import { useAuth } from "../AuthContext";
 import Toast from "react-native-toast-message";
 import LinearGradient from 'react-native-linear-gradient';
-import LoaderSpinner from '../LoaderSpinner'
+import LoaderSpinner from '../LoaderSpinner';
+import { getCategories as fetchCategories, getProducts as fetchProducts, addCategory, addProduct, addExpense } from '../services/apiService';
 
 const Expense = () => {
     const { id } = useAuth();
     const [visible, setVisible] = useState(false);
     const [productVisible, setProductVisible] = useState(false);
-    const [category, setCategory] = useState("");
     const [refreshFlag, setRefreshFlag] = useState(false);
 
     // Loading states
@@ -66,17 +65,17 @@ const Expense = () => {
     // Submit handlers for new category and product
     const handleCategorySubmit = async () => {
         if (!newCategory.trim()) {
-            Toast.show({ type: "error", text1: "Error", text2: "Please enter a category name", position: "top", visibilityTime: 3000 });
+            Toast.show({  type: "error", text1: "Error", text2: "Please enter a category name", position: "top", visibilityTime: 3000 });
             return;
         }
 
         try {
             setIsAddingCategory(true);
-            await axios.post("https://exciting-spice-armadillo.glitch.me/addshopcategory", {
-                id,
-                category: newCategory,
+            // Use the imported addCategory function from apiService
+            await addCategory(id, newCategory);
+            
+            Toast.show({ type: "success", text1: "Success", text2: "Category added successfully", position: "top", visibilityTime: 3000 
             });
-            Toast.show({ type: "success", text1: "Success", text2: "Category added successfully", position: "top", visibilityTime: 3000 });
             setRefreshFlag(prev => !prev);
             hideAddCategoryDialog();
         } catch (error) {
@@ -89,28 +88,26 @@ const Expense = () => {
 
     const handleProductSubmit = async () => {
         if (!newProduct.trim()) {
-            Toast.show({ type: "error", text1: "Error", text2: "Please enter a product name", position: "top", visibilityTime: 3000});
+            Toast.show({ type: "error", text1: "Error", text2: "Please enter a product name", position: "top", visibilityTime: 3000 });
             return;
         }
 
         if (!categoryValue) {
-            Toast.show({ type: "error", text1: "Error", text2: "Please select a category", position: "top", visibilityTime: 3000});
+            Toast.show({  type: "error", text1: "Error", text2: "Please select a category", position: "top", visibilityTime: 3000 });
             return;
         }
 
         try {
             setIsAddingProduct(true);
-            await axios.post("https://exciting-spice-armadillo.glitch.me/addproduct", {
-                id,
-                category: categoryValue,
-                product: newProduct
-            });
-            Toast.show({ type: "success", text1: "Success", text2: "Product added successfully", position: "top", visibilityTime: 3000});
+            // Use the imported addProduct function from apiService
+            await addProduct(id, categoryValue, newProduct);
+            
+            Toast.show({ type: "success", text1: "Success", text2: "Product added successfully", position: "top", visibilityTime: 3000 });
             setRefreshFlag(prev => !prev);
             hideAddProductDialog();
         } catch (error) {
             console.error('Error adding product:', error);
-            Toast.show({ type: "error", text1: "Error", text2: "Failed to add product", position: "top", visibilityTime: 3000});
+            Toast.show({ type: "error", text1: "Error", text2: "Failed to add product", position: "top", visibilityTime: 3000 });
         } finally {
             setIsAddingProduct(false);
         }
@@ -130,48 +127,55 @@ const Expense = () => {
         }
     };
 
-    // Fetch Categories
     useEffect(() => {
-        const getCategories = async () => {
-            try {
-                const response = await axios.get(`https://exciting-spice-armadillo.glitch.me/categories/${id}`);
-                const transformedData = response.data.map(item => ({
+        fetchCategoriesData();
+    }, [id, refreshFlag])
+
+    // Fetch Categories
+    const fetchCategoriesData = async () => {
+        try {
+            // Use the imported fetchCategories function from apiService
+            const data = await fetchCategories(id);
+            
+            if (data) {
+                const transformedData = data.map(item => ({
                     label: item.category,
                     value: item.category,
                     key: item.id.toString()
                 }));
                 setCategoryData(transformedData);
-            } catch (error) {
-                console.error('Error fetching categories:', error);
-                Toast.show({type: "error",text1: "Error",text2: "Failed to load categories",position: "top",visibilityTime: 3000});
+                console.log('Categories fetched successfully.');
             }
-        };
-
-        if (id) getCategories();
-    }, [id, refreshFlag]);
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+            Toast.show({ type: "error", text1: "Error", text2: "Failed to load categories", position: "top", visibilityTime: 3000 });
+        }
+    };
 
     // Fetch Products when category changes
     useEffect(() => {
-        const getProducts = async () => {
+        const fetchProductsData = async () => {
             if (!categoryValue) return;
 
             try {
-                const response = await axios.get(
-                    `https://exciting-spice-armadillo.glitch.me/products?category=${categoryValue}&user_id=${id}`
-                );
-                const transformedData = response.data.map(item => ({
-                    label: item.product,
-                    value: item.product,
-                    key: item.id.toString()
-                }));
-                setProductData(transformedData);
+                // Use the imported fetchProducts function from apiService
+                const data = await fetchProducts(id, categoryValue);
+                
+                if (data) {
+                    const transformedData = data.map(item => ({
+                        label: item.product,
+                        value: item.product,
+                        key: item.id.toString()
+                    }));
+                    setProductData(transformedData);
+                }
             } catch (error) {
                 console.error('Error fetching products:', error);
-                Toast.show({ type: "error",text1: "Error",text2: "Failed to load products",position: "top",visibilityTime: 3000});
+                Toast.show({ type: "error", text1: "Error", text2: "Failed to load products", position: "top", visibilityTime: 3000 });
             }
         };
 
-        getProducts();
+        fetchProductsData();
     }, [categoryValue, refreshFlag, id]);
 
     const handleImagePicker = () => {
@@ -262,8 +266,11 @@ const Expense = () => {
                 image: selectedImage
             };
 
-            await axios.post("https://exciting-spice-armadillo.glitch.me/postExpenseData", expenseData);
-            Toast.show({ type: "success", text1: "Success", text2: "Expense added successfully", position: "top", visibilityTime: 3000, autoHide: true });
+            // Use the imported addExpense function from apiService
+            await addExpense(expenseData);
+            
+            Toast.show({ type: "success", text1: "Success", text2: "Expense added successfully", position: "top", visibilityTime: 3000, autoHide: true 
+            });
             handleClear();
         } catch (error) {
             console.error('Error submitting expense:', error);
@@ -276,7 +283,7 @@ const Expense = () => {
     return (
         <>
             <LoaderSpinner shouldLoad={isAddingCategory || isAddingProduct || isAddingExpense} />
-            <ScrollView  contentContainerStyle={styles.scrollContainer} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={styles.scrollContainer} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
                 <ThemedView style={styles.container}>
                     <ThemedView style={styles.formContainer}>
                         <View style={styles.rowContainer}>
@@ -287,12 +294,12 @@ const Expense = () => {
                                         <Icon name="add-circle" size={24} color="#4CAF50" />
                                     </TouchableOpacity>
                                 </View>
-                                <DropDownPicker open={categoryOpen} value={categoryValue} items={categoryData} 
+                                <DropDownPicker open={categoryOpen} value={categoryValue} items={categoryData}
                                     setOpen={(isOpen) => {
                                         setCategoryOpen(isOpen);
                                         if (isOpen) setProductOpen(false);
                                     }}
-                                    setValue={setCategoryValue} setItems={setCategoryData} 
+                                    setValue={setCategoryValue} setItems={setCategoryData}
                                     placeholder="Select Category" style={styles.dropdown}
                                     dropDownContainerStyle={styles.dropdownList} textStyle={styles.dropdownText} listMode="SCROLLVIEW"
                                 />
@@ -310,7 +317,7 @@ const Expense = () => {
                                 {categoryValue === "others" || categoryValue === "other" || categoryValue === "Other" || categoryValue === "OTHER" || categoryValue === "Others" || categoryValue === "OTHERS" ? (
                                     <ThemedTextInput placeholder="Enter Expense" value={productValue} onChangeText={setProductValue} style={styles.input} />
                                 ) : (
-                                    <DropDownPicker open={productOpen} value={productValue} items={productData} 
+                                    <DropDownPicker open={productOpen} value={productValue} items={productData}
                                         setOpen={(isOpen) => {
                                             setProductOpen(isOpen);
                                             if (isOpen) setCategoryOpen(false);
@@ -324,7 +331,7 @@ const Expense = () => {
 
                         <View style={styles.inputSection}>
                             <ThemedText style={styles.label}>Cost</ThemedText>
-                            <ThemedTextInput  placeholder="Enter Cost"  value={cost}  onChangeText={setCost} keyboardType="numeric"  style={styles.input} />
+                            <ThemedTextInput placeholder="Enter Cost" value={cost} onChangeText={setCost} keyboardType="numeric" style={styles.input} />
                         </View>
 
                         <View style={styles.inputSection}>
@@ -335,13 +342,13 @@ const Expense = () => {
                                 </ThemedText>
                             </TouchableOpacity>
                             {showDatePicker && (
-                                <DateTimePicker  value={purchaseDate ? new Date(purchaseDate) : new Date()}  mode="date"  display="default"  onChange={handleDateChange}  />
+                                <DateTimePicker value={purchaseDate ? new Date(purchaseDate) : new Date()} mode="date" display="default" onChange={handleDateChange} />
                             )}
                         </View>
 
                         <View style={styles.inputSection}>
                             <ThemedText style={styles.label}>Description</ThemedText>
-                            <ThemedTextAreaInput  placeholder="Enter Description"  value={description}  onChangeText={setDescription}  style={styles.textArea} />
+                            <ThemedTextAreaInput placeholder="Enter Description" value={description} onChangeText={setDescription} style={styles.textArea} />
                         </View>
 
                         <View style={styles.imageSection}>
@@ -361,13 +368,13 @@ const Expense = () => {
                         <View style={styles.taxSection}>
                             <View style={styles.switchContainer}>
                                 <ThemedText style={styles.label}>Tax Applicable</ThemedText>
-                                <Switch  value={isTaxApplicable}  onValueChange={handleTaxToggle}  trackColor={{ false: '#767577', true: '#81b0ff' }}  thumbColor={isTaxApplicable ? '#1976D2' : '#f4f3f4'} />
+                                <Switch value={isTaxApplicable} onValueChange={handleTaxToggle} trackColor={{ false: '#767577', true: '#81b0ff' }} thumbColor={isTaxApplicable ? '#1976D2' : '#f4f3f4'} />
                             </View>
 
                             {isTaxApplicable && (
                                 <View style={styles.taxDetails}>
-                                    <ThemedTextInput  placeholder="Tax Percentage"  value={taxPercentage}  onChangeText={handleTaxPercentageChange}  keyboardType="numeric"  style={styles.input} />
-                                    <ThemedTextInput  placeholder="Tax Amount"  value={taxAmount} editable={false}  style={[styles.input, styles.disabledInput]} 
+                                    <ThemedTextInput placeholder="Tax Percentage" value={taxPercentage} onChangeText={handleTaxPercentageChange} keyboardType="numeric" style={styles.input} />
+                                    <ThemedTextInput placeholder="Tax Amount" value={taxAmount} editable={false} style={[styles.input, styles.disabledInput]}
                                     />
                                 </View>
                             )}
@@ -392,7 +399,7 @@ const Expense = () => {
             <Toast />
 
             {/* Add Category Modal */}
-            <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={hideAddCategoryDialog}>
+            <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={hideAddCategoryDialog}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <ThemedView style={styles.modalContent}>
@@ -411,7 +418,7 @@ const Expense = () => {
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={handleCategorySubmit} style={styles.modalButton}>
                                     <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                                        <ThemedText style={styles.buttonText}>Add Category</ThemedText>
+                                        <ThemedText style={styles.buttonText}>Add </ThemedText>
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </View>
@@ -421,23 +428,23 @@ const Expense = () => {
             </Modal>
 
             {/* Add Product Modal */}
-            <Modal animationType="fade" transparent={true} visible={productVisible} onRequestClose={hideAddProductDialog}>
+            <Modal animationType="slide" transparent={true} visible={productVisible} onRequestClose={hideAddProductDialog}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <ThemedView style={styles.modalContent}>
                             <ThemedText style={styles.modalTitle}>Add New Product</ThemedText>
-                            
+
                             <ThemedView style={styles.inputContainer}>
                                 <ThemedText style={styles.modalLabel}>Category:</ThemedText>
-                                <DropDownPicker  open={categoryOpen} value={categoryValue} items={categoryData}
+                                <DropDownPicker open={categoryOpen} value={categoryValue} items={categoryData}
                                     setOpen={setCategoryOpen} setValue={setCategoryValue} setItems={setCategoryData}
-                                    placeholder="Select Category" style={styles.modalDropdown} dropDownContainerStyle={styles.modalDropdownList} textStyle={styles.dropdownText}  listMode="SCROLLVIEW" disabled={true}
+                                    placeholder="Select Category" style={styles.modalDropdown} dropDownContainerStyle={styles.modalDropdownList} textStyle={styles.dropdownText} listMode="SCROLLVIEW" disabled={true}
                                 />
                             </ThemedView>
 
                             <ThemedView style={styles.inputContainer}>
                                 <ThemedText style={styles.modalLabel}>Product Name:</ThemedText>
-                                <ThemedTextInput  placeholder="Enter Product Name" value={newProduct} onChangeText={setNewProduct} style={styles.modalInput}
+                                <ThemedTextInput placeholder="Enter Product Name" value={newProduct} onChangeText={setNewProduct} style={styles.modalInput}
                                 />
                             </ThemedView>
 
@@ -449,7 +456,7 @@ const Expense = () => {
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={handleProductSubmit} style={styles.modalButton}>
                                     <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                                        <ThemedText style={styles.buttonText}>Add Product</ThemedText>
+                                        <ThemedText style={styles.buttonText}>Add</ThemedText>
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </View>

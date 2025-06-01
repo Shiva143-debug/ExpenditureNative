@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, Button, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import axios from 'axios';
 import Toast from 'react-native-toast-message';
 import { useAuth } from './AuthContext';
-
+import { loginUser } from "./services/apiService"
 
 const Login = ({ navigation }) => {
     const { login } = useAuth();
@@ -31,21 +30,22 @@ const Login = ({ navigation }) => {
         return Object.keys(errors).length === 0;
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (validateForm()) {
-            setLoading(true);
             const loginData = { loginEmail: formData.loginEmail, password: formData.password };
+            try {
+                setLoading(true);
+                const data = await loginUser(loginData);
+                console.log("recieved response",data)
+                Toast.show({ type: 'success', position: 'top', text1: 'Success', text2: data.message });
+                login(data.result.id);
+            } catch (error) {
+                // console.log(error);
+                Toast.show({ type: 'error', position: 'top', text1: 'Error', text2: 'Invalid email or password' });
+            } finally {
+                setLoading(false)
+            }
 
-            axios.post('https://exciting-spice-armadillo.glitch.me/login', loginData)
-                .then(res => {
-                    console.log(res)
-                    Toast.show({ type: 'success', position: 'top', text1: 'Success', text2: 'Login successfully' });
-                    login(res.data.result.id);
-                })
-                .catch(err => {
-                    Toast.show({ type: 'error', position: 'top', text1: 'Error', text2: 'Invalid email or password' });
-                })
-                .finally(() => setLoading(false));
         }
     };
 

@@ -12,21 +12,21 @@ import ExpenceReport from './ExpenceReport';
 import ProductReport from './ProductReport';
 import SourceReport from './SourceReport';
 import Reports from './Reports';
-// import Expence from "./Forms/Expence";
-// import Source from "./Forms/Source";
-// import Product from "./Product";
+
 import Dashboard from './DashboardScreens/Dashboard';
 import ItemReport from './DashboardScreens/Expences/ItemReport';
 import ExpensesList from './DashboardScreens/Expences/ExpensesList';
 
 import IncomeList from './DashboardScreens/IncomeList';
 import BalanceList from './DashboardScreens/BalanceList';
-import Add from './Add';
+import Add from './Forms/Add';
 import ProductDetail from './ProductDetail';
 import Header from './Header';
 import TaxAmountList from './DashboardScreens/TaxAmountList';
 import ExpenseByCategoryList from "./DashboardScreens/Expences/ExpenseByCategoryList";
 import { ThemeProvider } from './context/ThemeContext';
+import TransactionReports from './Reports/transactionReports';
+import SavingsList from './DashboardScreens/SavingsList';
 
 
 const Tab = createBottomTabNavigator();
@@ -53,6 +53,7 @@ const DashboardStack = () => {
       <Stack.Screen name="ExpensesList" component={ExpensesList} options={{ headerShown: false }}/>
       <Stack.Screen name="IncomeList" component={IncomeList} options={{ headerShown: false }}/>
       <Stack.Screen name="BalanceList" component={BalanceList} options={{ headerShown: false }}/>
+      <Stack.Screen name="SavingsList" component={SavingsList} options={{ headerShown: false }}/>
       <Stack.Screen name="TaxAmountList" component={TaxAmountList} options={{ headerShown: false }}/>
       <Stack.Screen name="ExpenseByCategoryList" component={ExpenseByCategoryList} options={{ headerShown: false }}/>
     </Stack.Navigator>
@@ -82,17 +83,20 @@ const MainTabs = () => (
         else if (route.name === 'Category') iconName = 'category';
         else if (route.name === 'dashboard') iconName = 'dashboard';
         else if (route.name === 'Add') iconName = 'add-circle';
+        else if (route.name === 'transactionReports') iconName = 'assignment';
 
         return <Icon name={iconName} size={size} color={color} />;
       },
     })}
   >
-    <Tab.Screen name="dashboard" component={DashboardStack}  options={{ headerShown: false }} />
+    <Tab.Screen name="dashboard" component={DashboardStack}  options={{ headerShown: false,title:"Dashboard"  }} />
     <Tab.Screen name="Add" component={Add} options={{ headerShown: false,title:"ADD" }} />
     {/* <Tab.Screen name="Expence" component={Expence} />
     <Tab.Screen name="Source" component={Source} /> */}
     {/* <Tab.Screen name="Category" component={Product} /> */}
-    <Tab.Screen name="Reports" component={ReportsStack} options={{ headerShown: false }} />
+    {/* <Tab.Screen name="Reports" component={ReportsStack} options={{ headerShown: false }} /> */}
+      {/* <Tab.Screen name="Reports" component={ReportsStack} options={{ headerShown: false }} /> */}
+      <Tab.Screen name="transactionReports" component={TransactionReports} options={{ headerShown: false,title:"Reports" }} />
   </Tab.Navigator>
 );
 

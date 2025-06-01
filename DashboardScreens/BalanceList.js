@@ -6,20 +6,20 @@ import ThemedView from '../components/ThemedView';
 import ThemedText from '../components/ThemedText';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import {getAllSourceData,getExpenseCosts} from "../services/apiService"
+import { useAuth } from '../AuthContext';
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 const BalanceList = () => {
-    const route = useRoute();
-    const { id } = route.params;
+    const { id } =  useAuth();
     const [totalIncomeData, setTotalIncome] = useState([]);
     const [totalCostData, setExpenseCost] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const getIncomeData = async () => {
         try {
-            const response = await fetch(`https://exciting-spice-armadillo.glitch.me/getSourceData/${id}`);
-            const data = await response.json();
+            const data = await getAllSourceData(id);
             setTotalIncome(data);
         } catch (err) {
             console.log(err);
@@ -28,8 +28,7 @@ const BalanceList = () => {
 
     const getExpenseData = async () => {
         try {
-            const response = await fetch(`https://exciting-spice-armadillo.glitch.me/getExpenseCost/${id}`);
-            const data = await response.json();
+           const data = await getExpenseCosts(id);
             setExpenseCost(data);
         } catch (err) {
             console.log(err);

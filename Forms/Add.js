@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import Expence from  "./Forms/Expence"
-import Source from './Forms/Source';
-import ThemedView from './components/ThemedView';
-import ThemedText from './components/ThemedText';
+import Expence from  "./Expence"
+import Source from './Source';
+import ThemedView from '../components/ThemedView';
+import ThemedText from '../components/ThemedText';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
