@@ -166,12 +166,9 @@ export const addSource = async (sourceData) => {
 };
 
 
-export const addDefaultSource = async (userId, sourceName) => {
+export const addDefaultSource = async (sourceData) => {
   try {
-    const response = await api.post('/adddefaultsource', { 
-      id: userId, 
-      sourceName 
-    });
+    const response = await api.post('/adddefaultsource', sourceData);
     return response.data;
   } catch (error) {
     handleError(error, 'Error adding default source');
