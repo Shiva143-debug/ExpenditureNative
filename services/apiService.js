@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 // Base URL for all API calls
-const BASE_URL = 'https://exciting-spice-armadillo.glitch.me';
+// https://backend-exp-1.onrender.com
+// https://exciting-spice-armadillo.glitch.me
+const BASE_URL = 'https://backend-exp-1.onrender.com';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -166,12 +168,9 @@ export const addSource = async (sourceData) => {
 };
 
 
-export const addDefaultSource = async (userId, sourceName) => {
+export const addDefaultSource = async (sourceData) => {
   try {
-    const response = await api.post('/adddefaultsource', {
-      id: userId,
-      sourceName
-    });
+    const response = await api.post('/adddefaultsource', sourceData);
     return response.data;
   } catch (error) {
     handleError(error, 'Error adding default source');
