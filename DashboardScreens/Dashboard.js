@@ -8,7 +8,7 @@ import LoaderSpinner from "../LoaderSpinner";
 import LinearGradient from 'react-native-linear-gradient';
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
-import { getExpenseCosts, getIncomeSources } from "../services/apiService"
+import { getExpenseCosts, getIncomeSources, getSavingsDataByMonthYear } from "../services/apiService"
 
 const Dashboard = () => {
   const { id } = useAuth();
@@ -41,6 +41,7 @@ const Dashboard = () => {
 
   const [expenseData, setExpenseData] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
+  const [savings, setSavings] = useState([]);
   const [taxAmount, setTaxAmount] = useState(0);
   const navigation = useNavigation();
 
@@ -83,7 +84,8 @@ const Dashboard = () => {
           // Fetch all data in parallel
           const [expenseResult, incomeResult] = await Promise.all([
             getExpenses(),
-            getIncome()
+            getIncome(),
+            fetchSavingsData()
           ]);
 
           // Store all expense data
@@ -110,6 +112,18 @@ const Dashboard = () => {
     }, [id, Month, Year])
   );
 
+  // useEffect(()=>{
+  //     fetchSavingsData();
+  //     console.log("fetching savings data");
+  // },[id,Month, Year])
+
+  const fetchSavingsData = async () => {
+        setLoading(true)
+        const data = await getSavingsDataByMonthYear(id,Month, Year);
+        console.log("monthwisedata",data);
+        setSavings(data || []);
+        setLoading(false);
+  }
   // Calculate totals from the filtered data
   const totalExpenses = expenseData
     .filter(expense => expense.month.toString() === Month && expense.year.toString() === Year)
@@ -159,21 +173,22 @@ const Dashboard = () => {
     navigation.navigate('ExpenseByCategoryList');
   };
 
+  const totalSavings = savings.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
   return (
     <ThemedView style={styles.mainContainer}>
       <ScrollView style={styles.scrollView}>
         <LoaderSpinner shouldLoad={loading} />
 
         {/* Header Section */}
-        <ThemedView style={styles.headerSection}>
-          <Text style={styles.greeting}>Financial Dashboard</Text>
+        <LinearGradient colors={['#1976D2', '#42A5F5']} style={styles.headerSection}>
+          <ThemedText style={styles.greeting}>Financial Dashboard</ThemedText>
 
           {!showDropdowns ? (
             <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDropdowns(true)}>
               <Icon name="event" size={24} color="#FFF" />
-              <Text style={styles.dateText}>
+              <ThemedText style={styles.dateText}>
                 {months.find((m) => m.value === Month)?.label} {Year}
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
           ) : (
             <ThemedView style={styles.dropdownsContainer}>
@@ -197,110 +212,124 @@ const Dashboard = () => {
               </View>
             </ThemedView>
           )}
-        </ThemedView>
+        </LinearGradient>
 
-        {/* Main Stats Section */}
-        <ThemedView style={styles.statsContainer}>
-          <TouchableOpacity style={styles.mainCard} onPress={handlePressIncome}>
-            <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.gradientCard}>
-              <View style={styles.cardContent}>
-                <View>
-                  <Text style={styles.cardLabel}>Total Income</Text>
-                  <Text style={styles.cardValue}>₹{totalIncome.toLocaleString()}</Text>
-                </View>
-                <Icon name="trending-up" size={30} color="#FFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Main Stats Section */}
+          <ThemedView style={styles.statsContainer}>
+            <View style={styles.cardsRow}>
+              <TouchableOpacity style={styles.mainCard} onPress={handlePressIncome}>
+                <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.gradientCard}>
+                  <View style={styles.cardContent}>
+                    <View>
+                      <ThemedText style={styles.cardLabel}>Income</ThemedText>
+                      <ThemedText style={styles.cardValue}>₹{totalIncome.toLocaleString()}</ThemedText>
+                    </View>
+                    <Icon name="trending-up" size={24} color="#FFF" />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
 
-          <TouchableOpacity style={styles.mainCard} onPress={handlePressExpence}>
-            <LinearGradient colors={['#FF5252', '#D32F2F']} style={styles.gradientCard}>
-              <View style={styles.cardContent}>
-                <View>
-                  <Text style={styles.cardLabel}>Total Expenses</Text>
-                  <Text style={styles.cardValue}>₹{totalExpenses.toLocaleString()} </Text>
-                </View>
-                <Icon name="trending-down" size={30} color="#FFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </ThemedView>
+              <TouchableOpacity style={styles.mainCard} onPress={handlePressExpence}>
+                <LinearGradient colors={['#FF5252', '#D32F2F']} style={styles.gradientCard}>
+                  <View style={styles.cardContent}>
+                    <View>
+                      <ThemedText style={styles.cardLabel}>Expenses</ThemedText>
+                      <ThemedText style={styles.cardValue}>₹{totalExpenses.toLocaleString()}</ThemedText>
+                    </View>
+                    <Icon name="trending-down" size={24} color="#FFF" />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
 
-        {/* Secondary Stats */}
-        <ThemedView style={styles.secondaryStats}>
-          <ThemedView style={styles.secondaryCard}>
-            <TouchableOpacity
-              style={[
-                styles.secondaryCardContent,
-                { opacity: taxAmount > 0 ? 1 : 0.6 }
-              ]}
-              onPress={taxAmount > 0 ? handlePressTax : null}
-            >
-              <Icon name="receipt" size={24} color="#1976D2" />
-              <View>
-                <ThemedText style={styles.secondaryLabel}>Tax Amount</ThemedText>
-                <ThemedText style={styles.secondaryValue}>₹{taxAmount.toLocaleString()}</ThemedText>
-
-              </View>
-              {taxAmount > 0 && (
-                <Icon name="arrow-forward-ios" size={20} color="#1976D2" />
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.mainCard} onPress={handlePressSavings}>
+                <LinearGradient colors={['#7986CB', '#3F51B5']} style={styles.gradientCard}>
+                  <View style={styles.cardContent}>
+                    <View>
+                      <ThemedText style={styles.cardLabel}>Savings</ThemedText>
+                      <ThemedText style={styles.cardValue}>₹{totalSavings.toLocaleString()}</ThemedText>
+                    </View>
+                    <Icon name="savings" size={24} color="#FFF" />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </ThemedView>
 
-          <ThemedView style={styles.secondaryCard} >
-            <TouchableOpacity style={styles.secondaryCardContent}>
-              <Icon name="account-balance-wallet" size={24} color="#1976D2" />
-              <View>
-                <ThemedText style={styles.secondaryLabel}>Balance</ThemedText>
-                <ThemedText style={[styles.secondaryValue,
-                { color: (totalIncome - totalExpenses) < 0 ? '#D32F2F' : '#2E7D32' }]}>
-                  ₹{Math.abs(totalIncome - totalExpenses).toLocaleString()}
-                </ThemedText>
-              </View>
-            </TouchableOpacity>
+          {/* Secondary Stats */}
+          <ThemedView style={styles.secondaryStats}>
+            <ThemedView style={styles.secondaryCard}>
+              <TouchableOpacity
+                style={[
+                  styles.secondaryCardContent,
+                  { opacity: taxAmount > 0 ? 1 : 0.6 }
+                ]}
+                onPress={taxAmount > 0 ? handlePressTax : null}
+              >
+                <Icon name="receipt" size={24} color="#1976D2" />
+                <View>
+                  <ThemedText style={styles.secondaryLabel}>Tax Amount</ThemedText>
+                  <ThemedText style={styles.secondaryValue}>₹{taxAmount.toLocaleString()}</ThemedText>
+
+                </View>
+                {taxAmount > 0 && (
+                  <Icon name="arrow-forward-ios" size={20} color="#1976D2" />
+                )}
+              </TouchableOpacity>
+            </ThemedView>
+
+            <ThemedView style={styles.secondaryCard} >
+              <TouchableOpacity style={styles.secondaryCardContent}>
+                <Icon name="account-balance-wallet" size={24} color="#1976D2" />
+                <View>
+                  <ThemedText style={styles.secondaryLabel}>Balance</ThemedText>
+                  <ThemedText style={[styles.secondaryValue,
+                  { color: (totalIncome - (totalExpenses+totalSavings)) < 0 ? '#D32F2F' : '#2E7D32' }]}>
+                    ₹{Math.abs(totalIncome - (totalExpenses+totalSavings)).toLocaleString()}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            </ThemedView>
           </ThemedView>
-        </ThemedView>
 
-        {/* Quick Actions */}
-        <ThemedView style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionCard} onPress={handlePressExpenceByCat}>
-            <LinearGradient colors={['#7B1FA2', '#4A148C']} style={styles.gradientAction}>
-              <View style={styles.actionContent}>
-                <View style={styles.actionLeft}>
-                  <Icon name="pie-chart" size={30} color="#FFF" />
-                  <Text style={styles.actionText}>Expenses By Categories</Text>
+          {/* Quick Actions */}
+          <ThemedView style={styles.quickActions}>
+            <TouchableOpacity style={styles.actionCard} onPress={handlePressExpenceByCat}>
+              <LinearGradient colors={['#7B1FA2', '#4A148C']} style={styles.gradientAction}>
+                <View style={styles.actionContent}>
+                  <View style={styles.actionLeft}>
+                    <Icon name="pie-chart" size={30} color="#FFF" />
+                    <Text style={styles.actionText}>Expenses By Categories</Text>
+                  </View>
+                  <Icon name="arrow-forward-ios" size={20} color="#FFF" />
                 </View>
-                <Icon name="arrow-forward-ios" size={20} color="#FFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={handlePressBalance}>
-            <LinearGradient colors={['#1976D2', '#0D47A1']} style={styles.gradientAction}>
-              <View style={styles.actionContent}>
-                <View style={styles.actionLeft}>
-                  <Icon name="assessment" size={30} color="#FFF" />
-                  <Text style={styles.actionText}>View Balance Details</Text>
+            <TouchableOpacity style={styles.actionCard} onPress={handlePressBalance}>
+              <LinearGradient colors={['#1976D2', '#0D47A1']} style={styles.gradientAction}>
+                <View style={styles.actionContent}>
+                  <View style={styles.actionLeft}>
+                    <Icon name="assessment" size={30} color="#FFF" />
+                    <Text style={styles.actionText}>View Balance Details</Text>
+                  </View>
+                  <Icon name="arrow-forward-ios" size={20} color="#FFF" />
                 </View>
-                <Icon name="arrow-forward-ios" size={20} color="#FFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={handlePressSavings}>
-            <LinearGradient colors={['lightgreen', 'green']} style={styles.gradientAction}>
-              <View style={styles.actionContent}>
-                <View style={styles.actionLeft}>
-                  <Icon name="payments" size={30} color="#FFF" />
-                  <Text style={styles.actionText}>Total Savings</Text>
+            <TouchableOpacity style={styles.actionCard} onPress={handlePressSavings}>
+              <LinearGradient colors={['lightgreen', 'green']} style={styles.gradientAction}>
+                <View style={styles.actionContent}>
+                  <View style={styles.actionLeft}>
+                    <Icon name="payments" size={30} color="#FFF" />
+                    <Text style={styles.actionText}>Total Savings</Text>
+                  </View>
+                  <Icon name="arrow-forward-ios" size={20} color="#FFF" />
                 </View>
-                <Icon name="arrow-forward-ios" size={20} color="#FFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
 
-        </ThemedView>
+          </ThemedView>
       </ScrollView>
     </ThemedView>
   );
@@ -357,13 +386,21 @@ const styles = StyleSheet.create({
   statsContainer: {
     padding: 15,
   },
+  cardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   mainCard: {
+    flex: 1,
+    minWidth: '30%',
     marginBottom: 15,
     borderRadius: 12,
     overflow: 'hidden',
   },
   gradientCard: {
-    padding: 20,
+    padding: 15,
   },
   cardContent: {
     flexDirection: 'row',
@@ -372,13 +409,13 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 12,
     opacity: 0.9,
     marginBottom: 5,
   },
   cardValue: {
     color: '#FFF',
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   secondaryStats: {

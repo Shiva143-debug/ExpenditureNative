@@ -33,7 +33,7 @@ export const getExpenseCosts = async (userId) => {
 export const getFilteredExpenses = async (userId, month, year) => {
   try {
     const allExpenses = await getExpenseCosts(userId);
-    
+
     if (Array.isArray(allExpenses)) {
       // Filter by selected month and year
       const filteredByDate = allExpenses.filter(item => {
@@ -49,7 +49,7 @@ export const getFilteredExpenses = async (userId, month, year) => {
         (a, b) => new Date(b.p_date) - new Date(a.p_date)
       );
     }
-    
+
     return [];
   } catch (error) {
     handleError(error, 'Error filtering expenses');
@@ -112,10 +112,10 @@ export const getProducts = async (userId, category) => {
 
 export const addProduct = async (userId, category, product) => {
   try {
-    const response = await api.post('/addproduct', { 
-      id: userId, 
-      category, 
-      product 
+    const response = await api.post('/addproduct', {
+      id: userId,
+      category,
+      product
     });
     return response.data;
   } catch (error) {
@@ -168,9 +168,9 @@ export const addSource = async (sourceData) => {
 
 export const addDefaultSource = async (userId, sourceName) => {
   try {
-    const response = await api.post('/adddefaultsource', { 
-      id: userId, 
-      sourceName 
+    const response = await api.post('/adddefaultsource', {
+      id: userId,
+      sourceName
     });
     return response.data;
   } catch (error) {
@@ -213,7 +213,16 @@ export const getSavingsData = async (userId) => {
   }
 };
 
-export const deleteSaving = async (savingId,id) => {
+export const getSavingsDataByMonthYear = async (userId, month, year) => {
+  try {
+    const response = await api.get(`/getSavings/${userId}/${month}/${year}`);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'Error fetching savings');
+  }
+};
+
+export const deleteSaving = async (savingId, id) => {
   try {
     const response = await api.delete(`/savings/${savingId}/${id}`);
     return response.data;
@@ -237,29 +246,30 @@ export default {
   getExpenseCosts,
   getFilteredExpenses,
   addExpense,
-  
+
   // Category related
   getCategories,
   addCategory,
   getCategoryReport,
-  
+
   // Product related
   getProducts,
   addProduct,
-  
+
   // Source/Income related
   getIncomeSources,
   getAllSourceData,
   getDefaultSources,
   addSource,
   addDefaultSource,
-  
+
   // User related
   registerUser,
   loginUser,
 
   //Savings related
   getSavingsData,
+  getSavingsDataByMonthYear,
   deleteSaving,
   addSaving
 };

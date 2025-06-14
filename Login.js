@@ -4,6 +4,8 @@ import { TextInput } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import { useAuth } from './AuthContext';
 import { loginUser } from "./services/apiService"
+import ThemedView from './components/ThemedView';
+import ThemedText from './components/ThemedText';
 
 const Login = ({ navigation }) => {
     const { login } = useAuth();
@@ -58,7 +60,7 @@ const Login = ({ navigation }) => {
     }, [formData]);
 
     return (
-        <View style={styles.container}>
+        <ThemedView style={styles.container}>
             <Toast />
             <Image source={{ uri: 'https://res.cloudinary.com/dxgbxchqm/image/upload/v1735652028/loginimage_blnefc.jpg' }} style={styles.logo} />
             <Text style={styles.heading}>Log In!!</Text>
@@ -76,23 +78,23 @@ const Login = ({ navigation }) => {
 
                             <Button title={loading ? 'Loading...' : 'Log In'} onPress={handleSubmit} disabled={loading} />
 
-                            <Text style={styles.BottomText}>Don't have an account?
-                                <Text onPress={handleSignupClick}>
+                            <ThemedText style={styles.BottomText}>Don't have an account?
+                                <ThemedText onPress={handleSignupClick}>
                                     <Text style={styles.signupText}> Register</Text>
-                                </Text>
-                            </Text>
+                                </ThemedText>
+                            </ThemedText>
                         </View>
                     </View>
                 </View>
             </View>
-        </View>
+        </ThemedView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        // backgroundColor: '#fff',
 
     },
     logo: {

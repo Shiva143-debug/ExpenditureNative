@@ -18,13 +18,13 @@ const Add = () => {
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         {/* Header */}
-        <ThemedView style={styles.header}>
+        {/* <ThemedView style={styles.header}>
           <LinearGradient  colors={['#1976D2', '#0D47A1']}  style={styles.headerGradient} >
             <ThemedText style={styles.headerTitle}>
               Add {selectedTab === 'expence' ? 'Expence' : 'Income'}
             </ThemedText>
           </LinearGradient>
-        </ThemedView>
+        </ThemedView> */}
 
         {/* Tab Buttons */}
         <ThemedView style={styles.buttonContainer}>

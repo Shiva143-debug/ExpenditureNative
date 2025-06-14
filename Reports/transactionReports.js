@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { Platform, FlatList, TouchableOpacity, StyleSheet, View, Alert, PermissionsAndroid } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -10,6 +10,9 @@ import LoaderSpinner from '../LoaderSpinner';
 import { getFilteredExpenses } from '../services/apiService';
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
 import Share from 'react-native-share';
+import { ThemeContext } from '../context/ThemeContext';
+import LinearGradient from 'react-native-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 
 const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -18,6 +21,7 @@ const monthNames = [
 
 const TransactionReports = () => {
     const { id } = useAuth();
+    const { theme } = useContext(ThemeContext);
     const [expenceData, setExpenceData] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [searchText, setSearchText] = useState('');
@@ -42,10 +46,24 @@ const TransactionReports = () => {
     const [Month, setMonth] = useState(currentMonth);
     const [Year, setYear] = useState(currentYear);
 
+    // Define colors based on theme
+    const iconColor = theme === 'dark' ? '#FFFFFF' : '#1976D2';
+    const cardBorderColor = theme === 'dark' ? '#444444' : '#E0E0E0';
+    const gradientColors = theme === 'dark'
+        ? ['#1A237E', '#283593']
+        : ['#1976D2', '#42A5F5'];
+
+    // Reset showFilters when navigating away and coming back
+    useFocusEffect(
+        React.useCallback(() => {
+            setShowFilters(false);
+            return () => { };
+        }, [])
+    );
 
     useEffect(() => {
         fetchExpenseData();
-    }, [id, Month, Year])
+    }, [id, Month, Year]);
 
     const fetchExpenseData = async () => {
         try {
@@ -90,14 +108,14 @@ const TransactionReports = () => {
             setLoading(true);
 
             // Sort data by category and product
-            const sortedAssets = [...filteredData].sort((a, b) => 
+            const sortedAssets = [...filteredData].sort((a, b) =>
                 a.category.localeCompare(b.category) || a.product.localeCompare(b.product)
             );
 
             // Calculate totals
             const totalCost = sortedAssets.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
             const totalTaxAmount = sortedAssets.reduce((sum, item) => sum + (parseFloat(item.tax_amount) || 0), 0);
-            
+
             // Group by category for better display
             const categories = {};
             sortedAssets.forEach(item => {
@@ -111,7 +129,7 @@ const TransactionReports = () => {
             let tableContent = '';
             Object.keys(categories).sort().forEach(category => {
                 const items = categories[category];
-                
+
                 // Add category header
                 tableContent += `
                     <tr style="background-color: #f2f2f2;">
@@ -120,7 +138,7 @@ const TransactionReports = () => {
                         </td>
                     </tr>
                 `;
-                
+
                 // Add items for this category
                 items.forEach(item => {
                     tableContent += `
@@ -234,7 +252,7 @@ const TransactionReports = () => {
             try {
                 const file = await RNHTMLtoPDF.convert(options);
                 console.log('PDF generated successfully:', file);
-                
+
                 // Share the PDF
                 if (file && file.filePath) {
                     const shareOptions = {
@@ -243,7 +261,7 @@ const TransactionReports = () => {
                         url: `file://${file.filePath}`,
                         type: 'application/pdf',
                     };
-                    
+
                     await Share.open(shareOptions);
                     Alert.alert('Success', 'Expense report generated successfully');
                 } else {
@@ -253,7 +271,7 @@ const TransactionReports = () => {
                 console.error('PDF generation error:', pdfError);
                 Alert.alert('Error', 'Failed to generate PDF: ' + pdfError.message);
             }
-            
+
         } catch (error) {
             console.error('Error in handleDownload function:', error);
             Alert.alert('Error', 'Failed to generate expense report: ' + error.message);
@@ -262,79 +280,146 @@ const TransactionReports = () => {
         }
     };
 
-    const renderHeader = () => (
-        <ThemedView style={styles.headerContainer}>
-            {!showFilters && (
-                <ThemedView style={styles.topRow}>
-                    <ThemedTextInput style={styles.searchBar} placeholder="Search by category, product, or description"
-                        value={searchText} onChangeText={handleSearch}
-                    />
-                    <TouchableOpacity onPress={() => setShowFilters(!showFilters)} style={styles.iconButton}>
-                        <Icon name="filter-list" size={24} color="#333" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleDownload} style={styles.iconButton}>
-                        <Icon name="file-download" size={24} color="#333" />
-                    </TouchableOpacity>
-                </ThemedView>
-            )}
+    const renderHeader = () => {
+        return (
+            <ThemedView style={styles.headerContainer}>
+                {!showFilters ? (
+                    <LinearGradient colors={gradientColors} style={styles.headerGradient}>
+                        <View style={styles.topRow}>
+                            <ThemedTextInput style={styles.searchBar} placeholder="Search by category, product, or description" placeholderTextColor={theme === 'dark' ? '#AAAAAA' : '#666666'} value={searchText} onChangeText={handleSearch} />
+                            <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.iconButton}>
+                                <Icon name="filter-list" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleDownload} style={styles.iconButton}>
+                                <Icon name="file-download" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+                        </View>
 
-            {showFilters && (
-                <ThemedView style={styles.filterContainer}>
-                    <ThemedView style={styles.dropdownsContainer}>
-                        <ThemedView style={styles.dropdownBox}>
-                            <DropDownPicker open={openMonth} value={Month} items={months} setValue={setMonth}
-                                setItems={setMonths} placeholder="Select Month" style={styles.picker} dropDownContainerStyle={styles.dropdownList} listMode="SCROLLVIEW"
-                                setOpen={(isOpen) => {
-                                    setOpenMonth(isOpen);
-                                    if (isOpen) setOpenYear(false);
-                                }}
-                            />
+                        <View style={styles.currentPeriod}>
+                            <Icon name="event" size={18} color="#FFFFFF" />
+                            <ThemedText style={styles.periodText}>{monthNames[Month - 1]} {Year}
+                            </ThemedText>
+                        </View>
+                    </LinearGradient>
+                ) : (
+                    <ThemedView style={styles.filterContainer}>
+                        <View style={styles.filterHeader}>
+                            <ThemedText style={styles.filterTitle}>Select Period</ThemedText>
+                            <TouchableOpacity onPress={() => setShowFilters(false)} style={styles.closeButton}>
+                                <Icon name="close" size={24} color={iconColor} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ThemedView style={styles.dropdownsContainer}>
+                            <ThemedView style={styles.dropdownBox}>
+                                <ThemedText style={styles.dropdownLabel}>Month</ThemedText>
+                                <DropDownPicker open={openMonth} value={Month} items={months} setValue={setMonth} setItems={setMonths} placeholder="Select Month"
+                                    style={styles.picker}
+                                    dropDownContainerStyle={styles.dropdownList} textStyle={styles.dropdownText} listMode="SCROLLVIEW"
+                                    setOpen={(isOpen) => {
+                                        setOpenMonth(isOpen);
+                                        if (isOpen) setOpenYear(false);
+                                    }}
+                                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+                                />
+                            </ThemedView>
+
+                            <ThemedView style={styles.dropdownBox}>
+                                <ThemedText style={styles.dropdownLabel}>Year</ThemedText>
+                                <DropDownPicker open={openYear} value={Year} items={years} setValue={setYear} setItems={setYears} placeholder="Select Year"
+                                    style={styles.picker}
+                                    dropDownContainerStyle={styles.dropdownList} textStyle={styles.dropdownText} listMode="SCROLLVIEW"
+                                    setOpen={(isOpen) => {
+                                        setOpenYear(isOpen);
+                                        if (isOpen) setOpenMonth(false);
+                                    }}
+                                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+                                />
+                            </ThemedView>
                         </ThemedView>
 
-                        <ThemedView style={styles.dropdownBox}>
-                            <DropDownPicker open={openYear} value={Year} items={years}
-                                setValue={setYear} setItems={setYears} placeholder="Select Year" style={styles.picker} dropDownContainerStyle={styles.dropdownList}
-                                listMode="SCROLLVIEW" setOpen={(isOpen) => {
-                                    setOpenYear(isOpen);
-                                    if (isOpen) setOpenMonth(false);
-                                }}
-                            />
-                        </ThemedView>
                     </ThemedView>
-
-
-                </ThemedView>
-            )}
-        </ThemedView>
-    )
+                )}
+            </ThemedView>
+        );
+    }
 
     return (
         <ThemedView style={styles.container}>
             <View style={styles.headerSection}>
                 {renderHeader()}
             </View>
+
             {loading ? (
                 <LoaderSpinner />
             ) : (
-                <View>
-                    <ThemedText style={[styles.title, { textAlign: "center", borderWidth: 2, borderBottomColor: "gray", marginBottom: 5 }]}>{monthNames[Month - 1]} - {Year} Reports</ThemedText>
+                <View style={styles.contentContainer}>
+                    <ThemedView style={styles.reportHeader}>
+                        <ThemedText style={styles.reportTitle}>
+                            {monthNames[Month - 1]} {Year} Expense Report
+                        </ThemedText>
+                        <ThemedText style={styles.reportSubtitle}>
+                            {filteredData.length} transactions found
+                        </ThemedText>
+                    </ThemedView>
 
-                    <FlatList data={filteredData} keyExtractor={(item, index) => index.toString()}
+                    <FlatList
+                        data={filteredData}
+                        keyExtractor={(item, index) => index.toString()}
+                        contentContainerStyle={styles.listContainer}
+                        showsVerticalScrollIndicator={false}
                         ListEmptyComponent={() => (
                             <ThemedView style={styles.noDataContainer}>
+                                <Icon name="receipt-long" size={48} color={iconColor} style={styles.noDataIcon} />
                                 <ThemedText style={styles.noDataText}>No expenses found</ThemedText>
+                                <ThemedText style={styles.noDataSubtext}>
+                                    Try changing filters or adding new expenses
+                                </ThemedText>
                             </ThemedView>
                         )}
                         renderItem={({ item }) => (
-                            <ThemedView style={styles.card}>
-                                <ThemedText style={styles.title}>Expence Name:{item.product}</ThemedText>
-                                <View style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
-                                    <ThemedText style={styles.subtitle}>Category:{item.category}</ThemedText>
-                                    <ThemedText style={styles.subtitle}>₹ {item.cost}</ThemedText>
+                            <ThemedView style={[styles.card, { borderColor: cardBorderColor }]}>
+                                <View style={styles.cardHeader}>
+                                    <ThemedText style={styles.productName} numberOfLines={1}>
+                                        {item.product}
+                                    </ThemedText>
+                                    <ThemedText style={styles.costAmount}>
+                                        ₹{parseFloat(item.cost).toLocaleString()}
+                                    </ThemedText>
                                 </View>
-                                <View style={{ width: "100%", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
-                                    <ThemedText style={styles.subtitle}>{item.p_date}</ThemedText>
-                                    <Icon name="arrow-forward-ios" size={14} color="gray" />
+
+                                <View style={styles.cardDetails}>
+                                    <View style={styles.detailRow}>
+                                        <Icon name="category" size={16} color={iconColor} style={styles.detailIcon} />
+                                        <ThemedText style={styles.detailText} numberOfLines={1}>
+                                            {item.category}
+                                        </ThemedText>
+                                    </View>
+
+                                    {item.tax_amount > 0 && (
+                                        <View style={styles.detailRow}>
+                                            <Icon name="receipt" size={16} color={iconColor} style={styles.detailIcon} />
+                                            <ThemedText style={styles.detailText}>
+                                                Tax: ₹{parseFloat(item.tax_amount).toLocaleString()}
+                                            </ThemedText>
+                                        </View>
+                                    )}
+
+                                    <View style={styles.detailRow}>
+                                        <Icon name="event" size={16} color={iconColor} style={styles.detailIcon} />
+                                        <ThemedText style={styles.detailText}>
+                                            {item.p_date}
+                                        </ThemedText>
+                                    </View>
+
+                                    {item.description && (
+                                        <View style={styles.detailRow}>
+                                            <Icon name="description" size={16} color={iconColor} style={styles.detailIcon} />
+                                            <ThemedText style={styles.detailText} numberOfLines={2}>
+                                                {item.description}
+                                            </ThemedText>
+                                        </View>
+                                    )}
                                 </View>
                             </ThemedView>
                         )}
@@ -346,104 +431,203 @@ const TransactionReports = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, },
-    headerSection: { paddingTop: 5, zIndex: 1, height: 80, },
-    headerContainer: { width: '100%', },
-    topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 5, },
+    container: {
+        flex: 1,
+    },
+    headerSection: {
+        // paddingTop: 5,
+        zIndex: 1,
+        height: 100,
+        marginBottom: 5,
+    },
+    headerContainer: {
+        width: '100%',
+    },
+    headerGradient: {
+        padding: 10,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+    },
+    topRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     searchBar: {
         flex: 1,
         borderWidth: 1,
-        borderColor: '#ccc',
+        borderColor: 'rgba(255, 255, 255, 0.3)',
         borderRadius: 8,
-        padding: 5,
+        padding: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        color: '#FFFFFF',
     },
     iconButton: {
-        marginLeft: 10,
-        padding: 6,
-        backgroundColor: '#e0e0e0',
-        borderRadius: 6,
+        marginLeft: 12,
+        padding: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        borderRadius: 8,
+    },
+    currentPeriod: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+    },
+    periodText: {
+        color: '#FFFFFF',
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: '500',
     },
     filterContainer: {
-        padding: 10,
+        padding: 16,
         borderRadius: 8,
-        marginBottom: 10,
         elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    filterHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    filterTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    dropdownLabel: {
+        marginBottom: 8,
+        fontSize: 14,
+    },
+    dropdownText: {
+        fontSize: 16,
     },
     dropdownsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        marginBottom: 16,
+        gap: 12,
     },
     dropdownBox: {
         flex: 1,
-        marginRight: 5,
         zIndex: 1000,
     },
     picker: {
-        borderWidth: 0,
+        borderColor: '#ccc',
         borderRadius: 8,
+        height: 45,
+        backgroundColor: "transparent"
     },
     dropdownList: {
-        borderWidth: 0,
-        borderRadius: 8,
-        maxHeight: 800
+       borderColor: '#ccc',
+        maxHeight: 800,
     },
-    applyBtn: {
-        backgroundColor: '#2196F3',
-        padding: 10,
-        borderRadius: 6,
+    applyButton: {
+        borderRadius: 8,
+        overflow: 'hidden',
+        marginTop: 8,
+    },
+    applyGradient: {
+        padding: 12,
         alignItems: 'center',
-        height: 50
     },
     applyText: {
-        color: '#fff',
+        color: '#FFFFFF',
         fontWeight: 'bold',
+        fontSize: 16,
+    },
+    contentContainer: {
+        flex: 1,
+        padding: 10,
+        paddingTop: 50,
+    },
+    reportHeader: {
+        marginBottom: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    },
+    reportTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    reportSubtitle: {
+        fontSize: 14,
+        opacity: 0.7,
+        // paddingTop:500
+    },
+    listContainer: {
+        paddingBottom: 16,
     },
     card: {
-        paddingHorizontal: 12,
-        borderRadius: 10,
-        marginBottom: 10,
-        elevation: 1,
-        borderWidth: 2,
-        borderBottomColor: "gray"
+        borderRadius: 12,
+        marginBottom: 12,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        borderWidth: 1,
+        overflow: 'hidden',
     },
-    title: {
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    productName: {
         fontSize: 16,
         fontWeight: 'bold',
-        paddingBottom: 5
+        flex: 1,
+        marginRight: 8,
     },
-    subtitle: {
+    costAmount: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    cardDetails: {
+        padding: 12,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    detailIcon: {
+        marginRight: 8,
+    },
+    detailText: {
         fontSize: 14,
-        paddingBottom: 10
+        flex: 1,
     },
     noDataContainer: {
-        padding: 20,
+        padding: 40,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    noDataIcon: {
+        marginBottom: 16,
+        opacity: 0.6,
     },
     noDataText: {
-        fontSize: 16,
-        color: '#999',
-        fontStyle: 'italic',
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    noDataSubtext: {
+        fontSize: 14,
+        textAlign: 'center',
+        opacity: 0.7,
     },
 });
 
 export default TransactionReports;
-
-
-
-
-{/* <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
-        <ThemedText style={styles.dateButtonText}>
-          {date ? `Selected Date: ${date}` : 'Pick a Date'}
-        </ThemedText>
-      </TouchableOpacity> */}
-
-{/* {showDatePicker && (
-        <DateTimePicker
-          value={date ? new Date(date) : new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      )} */}
-
-// const handleMonthSelect = (val) => {

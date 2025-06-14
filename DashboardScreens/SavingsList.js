@@ -145,7 +145,7 @@ const SavingsList = () => {
                     <ThemedText style={styles.amountText}>₹{parseFloat(item.amount).toLocaleString()}</ThemedText>
                 </View>
                 <View style={styles.cardTopRow}>
-                    {item.note ? (<ThemedText style={styles.noteText}>{item.note}</ThemedText>) : null}
+                    {item.note ? (<ThemedText style={styles.noteText}>{item.note}</ThemedText>) : <ThemedText>Not Provided</ThemedText>}
                     <View style={{ flexDirection: 'row' }}>
                         <TouchableOpacity onPress={() => console.log('Edit')}>
                             <Icon name="edit" size={20} color="#4CAF50" />
@@ -203,7 +203,7 @@ const SavingsList = () => {
 
                         <View style={styles.modalButtons}>
                             <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleClear}>
-                                <ThemedText style={styles.buttonText}>Cancel</ThemedText>
+                                <ThemedText style={styles.buttonText}>Clear</ThemedText>
                             </TouchableOpacity>
 
                             <TouchableOpacity style={[styles.button, styles.addButton]} onPress={handleAddSaving} >
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     cancelButton: {
-        backgroundColor: 'red',
+        backgroundColor: 'gray',
     },
     addButton: {
         backgroundColor: '#4CAF50',

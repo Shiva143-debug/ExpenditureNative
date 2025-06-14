@@ -4,6 +4,8 @@ import { View, Text, Image, Button, TouchableOpacity, StyleSheet, ActivityIndica
 import { TextInput } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import { registerUser } from "./services/apiService"
+import ThemedView from './components/ThemedView';
+import ThemedText from './components/ThemedText';
 
 const Register = ({ navigation }) => {
   const [formData, setFormData] = useState({ fullName: '', email: '', mobileNo: '', address: '' });
@@ -69,7 +71,7 @@ const Register = ({ navigation }) => {
   }, [formData]);
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <Toast />
       <Image source={{ uri: 'https://res.cloudinary.com/dxgbxchqm/image/upload/v1735649616/register_qziayq.jpg' }} style={styles.logo} />
       <Text style={styles.heading}>Register!!</Text>
@@ -88,21 +90,21 @@ const Register = ({ navigation }) => {
           {touchedFields.address && formErrors.address && (<Text style={styles.errorText}>{formErrors.address}</Text>)}
 
           <Button title={loading ? 'Creating...' : 'Create your free account'} onPress={handleFormSubmit} disabled={loading} />
-          <Text style={styles.BottomText}> Already have an account?{' '}
+          <ThemedText style={styles.BottomText}> Already have an account?{' '}
             <Text onPress={signInClick}>
               <Text style={styles.signInText}>Sign In</Text>
             </Text>
-          </Text>
+          </ThemedText>
         </View>
       </View>
-    </View>
+    </ThemedView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    // backgroundColor: '#fff',
   },
   formSection: {
     marginTop: 5,

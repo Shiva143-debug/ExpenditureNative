@@ -307,7 +307,7 @@ const Expense = () => {
 
                             <View style={styles.flexItem}>
                                 <View style={styles.labelRow}>
-                                    <ThemedText style={styles.label}>Product/Service</ThemedText>
+                                    <ThemedText style={styles.label}>Expence</ThemedText>
                                     {categoryValue && (
                                         <TouchableOpacity onPress={() => setProductVisible(true)}>
                                             <Icon name="add-circle" size={24} color="#4CAF50" />
@@ -322,7 +322,7 @@ const Expense = () => {
                                             setProductOpen(isOpen);
                                             if (isOpen) setCategoryOpen(false);
                                         }}
-                                        setValue={setProductValue} setItems={setProductData} placeholder="Select Product"
+                                        setValue={setProductValue} setItems={setProductData} placeholder="Select Expence"
                                         style={styles.dropdown} dropDownContainerStyle={styles.dropdownList} textStyle={styles.dropdownText} listMode="SCROLLVIEW"
                                     />
                                 )}
@@ -432,7 +432,7 @@ const Expense = () => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <ThemedView style={styles.modalContent}>
-                            <ThemedText style={styles.modalTitle}>Add New Product</ThemedText>
+                            <ThemedText style={styles.modalTitle}>Add CategoryExpence</ThemedText>
 
                             <ThemedView style={styles.inputContainer}>
                                 <ThemedText style={styles.modalLabel}>Category:</ThemedText>
@@ -443,8 +443,8 @@ const Expense = () => {
                             </ThemedView>
 
                             <ThemedView style={styles.inputContainer}>
-                                <ThemedText style={styles.modalLabel}>Product Name:</ThemedText>
-                                <ThemedTextInput placeholder="Enter Product Name" value={newProduct} onChangeText={setNewProduct} style={styles.modalInput}
+                                <ThemedText style={styles.modalLabel}>CategoryExpence Name:</ThemedText>
+                                <ThemedTextInput placeholder="Enter CategoryExpence Name" value={newProduct} onChangeText={setNewProduct} style={styles.modalInput}
                                 />
                             </ThemedView>
 
@@ -510,6 +510,7 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 8,
         height: 45,
+        backgroundColor:"transparent"
     },
     dropdownList: {
         borderColor: '#ccc',
@@ -517,6 +518,7 @@ const styles = StyleSheet.create({
     },
     dropdownText: {
         fontSize: 16,
+        color:"gray"
     },
     textArea: {
         height: 100,
@@ -653,6 +655,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         height: 45,
         marginBottom: 15,
+        backgroundColor:"transparent"
     },
     modalDropdownList: {
         borderColor: '#ccc',

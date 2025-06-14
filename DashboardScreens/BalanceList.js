@@ -6,15 +6,16 @@ import ThemedView from '../components/ThemedView';
 import ThemedText from '../components/ThemedText';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import {getAllSourceData,getExpenseCosts} from "../services/apiService"
+import { getAllSourceData, getExpenseCosts, getSavingsData } from "../services/apiService"
 import { useAuth } from '../AuthContext';
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 const BalanceList = () => {
-    const { id } =  useAuth();
+    const { id } = useAuth();
     const [totalIncomeData, setTotalIncome] = useState([]);
     const [totalCostData, setExpenseCost] = useState([]);
+    const [totalSavingsData, setTotalSavings] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const getIncomeData = async () => {
@@ -28,18 +29,27 @@ const BalanceList = () => {
 
     const getExpenseData = async () => {
         try {
-           const data = await getExpenseCosts(id);
+            const data = await getExpenseCosts(id);
             setExpenseCost(data);
         } catch (err) {
             console.log(err);
         }
     };
 
+
+    const getTotalSavingsData = async () => {
+        setLoading(true)
+        const data = await getSavingsData(id);
+        setTotalSavings(data || []);
+        setLoading(false);
+    };
+
+
     useEffect(() => {
         const fetchData = async () => {
             if (id) {
                 setLoading(true);
-                await Promise.all([getIncomeData(), getExpenseData()]);
+                await Promise.all([getIncomeData(), getExpenseData(), getTotalSavingsData()]);
                 setLoading(false);
             }
         };
@@ -59,17 +69,33 @@ const BalanceList = () => {
                 .filter(item => item.month == i && item.year == year)
                 .reduce((acc, curr) => acc + curr.cost, 0);
 
-            const balance = income - expenses;
+            // const balance = income - expenses;
+            const savings = totalSavingsData
+                .filter(item => item.month == i && item.year == year)
+                .reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
 
-            if (income > 0 || expenses > 0) {
+            const balance = income - (expenses + savings);
+
+            if (income > 0 || expenses > 0 || savings > 0) {
                 groupedArray.push({
                     year,
                     month: monthNames[i - 1],
                     income,
                     expenses,
+                    savings,
                     balance,
                 });
             }
+
+            // if (income > 0 || expenses > 0) {
+            //     groupedArray.push({
+            //         year,
+            //         month: monthNames[i - 1],
+            //         income,
+            //         expenses,
+            //         balance,
+            //     });
+            // }
         }
     });
 
@@ -81,39 +107,72 @@ const BalanceList = () => {
     });
 
     const renderHeader = () => {
-        const totalBalance = groupedArray.reduce((acc, curr) => acc + curr.balance, 0);
-        const isPositiveBalance = totalBalance >= 0;
         const totalIncome = groupedArray.reduce((sum, item) => sum + item.income, 0);
         const totalExpenses = groupedArray.reduce((sum, item) => sum + item.expenses, 0);
+        const totalSavings = totalSavingsData.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
+        const totalBalance = totalIncome - (totalExpenses+totalSavings);
+        const isPositiveBalance = totalBalance >= 0;
 
         return (
             <View style={styles.headerMainContainer}>
-                <LinearGradient  colors={isPositiveBalance ? ['#4CAF50', '#2E7D32'] : ['#F44336', '#C62828']}  style={styles.headerGradient}>
+                <LinearGradient colors={['#1976D2', '#42A5F5']} style={styles.headerGradient}>
                     <View style={styles.headerContent}>
                         <View style={styles.headerTop}>
-                            <ThemedText style={styles.headerTitle}>Total Available Balance</ThemedText>
+                            <ThemedText style={styles.headerTitle}>Financial Summary</ThemedText>
                             <Icon name={isPositiveBalance ? "trending-up" : "trending-down"} size={24} color="#FFF" />
                         </View>
-                        
-                        <ThemedText style={styles.balanceAmount}> ₹{Math.abs(totalBalance).toLocaleString()}</ThemedText>
-                        
-                        <View style={styles.statsContainer}>
-                            <View style={styles.statItem}>
-                                <Icon name="arrow-upward" size={20} color="#A5D6A7" />
-                                <View style={styles.statContent}>
-                                    <ThemedText style={styles.statLabel}>Total Income</ThemedText>
-                                    <ThemedText style={styles.statValue}> ₹{totalIncome.toLocaleString()}</ThemedText>
-                                </View>
+
+                        {/* Cards Row */}
+                        <View style={styles.cardsRow}>
+                            {/* Income Card */}
+                            <View style={styles.summaryCard}>
+                                <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.cardGradient}>
+                                    <View style={styles.cardInner}>
+                                        <Icon name="arrow-upward" size={24} color="#FFF" />
+                                        <ThemedText style={styles.cardLabel}>Income</ThemedText>
+                                        <ThemedText style={styles.cardValue}>₹{totalIncome.toLocaleString()}</ThemedText>
+                                    </View>
+                                </LinearGradient>
                             </View>
-                            
-                            <View style={styles.divider} />
-                            
-                            <View style={styles.statItem}>
-                                <Icon name="arrow-downward" size={20} color="#EF9A9A" />
-                                <View style={styles.statContent}>
-                                    <ThemedText style={styles.statLabel}>Total Expenses</ThemedText>
-                                    <ThemedText style={styles.statValue}>₹{Math.abs(totalExpenses).toLocaleString()}</ThemedText>
-                                </View>
+
+                            {/* Expenses Card */}
+                            <View style={styles.summaryCard}>
+                                <LinearGradient colors={['#F44336', '#C62828']} style={styles.cardGradient}>
+                                    <View style={styles.cardInner}>
+                                        <Icon name="arrow-downward" size={24} color="#FFF" />
+                                        <ThemedText style={styles.cardLabel}>Expenses</ThemedText>
+                                        <ThemedText style={styles.cardValue}>₹{totalExpenses.toLocaleString()}</ThemedText>
+                                    </View>
+                                </LinearGradient>
+                            </View>
+
+                            {/* Savings Card */}
+                            <View style={styles.summaryCard}>
+                                <LinearGradient colors={['#7986CB', '#3F51B5']} style={styles.cardGradient}>
+                                    <View style={styles.cardInner}>
+                                        <Icon name="savings" size={24} color="#FFF" />
+                                        <ThemedText style={styles.cardLabel}>Savings</ThemedText>
+                                        <ThemedText style={styles.cardValue}>₹{totalSavings.toLocaleString()}</ThemedText>
+                                    </View>
+                                </LinearGradient>
+                            </View>
+                        </View>
+
+                        {/* Balance Section */}
+                        <View style={styles.balanceSection}>
+                            <ThemedText style={styles.balanceLabel}>Total Available Balance</ThemedText>
+                            <View style={styles.balanceRow}>
+                                <Icon
+                                    name="account-balance-wallet"
+                                    size={28}
+                                    color={isPositiveBalance ? "#A5D6A7" : "#EF9A9A"}
+                                />
+                                <ThemedText style={[
+                                    styles.balanceAmount,
+                                    { color: isPositiveBalance ? "#A5D6A7" : "#EF9A9A" }
+                                ]}>
+                                    ₹{Math.abs(totalBalance).toLocaleString()}
+                                </ThemedText>
                             </View>
                         </View>
                     </View>
@@ -124,40 +183,61 @@ const BalanceList = () => {
 
     const renderBalanceCard = ({ item }) => {
         const isPositive = item.balance >= 0;
+        const savings = item.savings || 0;
+
         return (
             <ThemedView style={styles.cardContainer}>
                 <ThemedView style={styles.card}>
+                    <View style={styles.monthHeader}>
+                        <ThemedText style={styles.monthYear}>{item.month} {item.year}</ThemedText>
+                    </View>
+
                     <View style={styles.cardContent}>
-                        <View style={styles.monthYearContainer}>
-                            <ThemedText numberOfLines={1} style={styles.monthYear}> {item.month} {item.year} </ThemedText>
-                        </View>
-                        
                         <View style={styles.detailsContainer}>
                             <View style={styles.detailItem}>
                                 <Icon name="arrow-upward" size={20} color="#4CAF50" />
-                                <ThemedText numberOfLines={1} style={styles.detailText}> ₹{item.income.toLocaleString()} </ThemedText>
+                                <View style={styles.detailTextContainer}>
+                                    <ThemedText style={styles.detailLabel}>Income</ThemedText>
+                                    <ThemedText style={[styles.detailValue, { color: "#4CAF50" }]}>
+                                        ₹{item.income.toLocaleString()}
+                                    </ThemedText>
+                                </View>
                             </View>
 
                             <View style={styles.detailItem}>
                                 <Icon name="arrow-downward" size={20} color="#F44336" />
-                                <ThemedText numberOfLines={1} style={styles.detailText}>
-                                    ₹{Math.abs(item.expenses).toLocaleString()}
-                                </ThemedText>
+                                <View style={styles.detailTextContainer}>
+                                    <ThemedText style={styles.detailLabel}>Expense</ThemedText>
+                                    <ThemedText style={[styles.detailValue, { color: "#F44336" }]}>
+                                        ₹{item.expenses.toLocaleString()}
+                                    </ThemedText>
+                                </View>
                             </View>
 
                             <View style={styles.detailItem}>
-                                <Icon name="account-balance-wallet" size={20} color={isPositive ? "#4CAF50" : "#F44336"} />
-                                <ThemedText 
-                                    numberOfLines={1}
-                                    style={[
-                                        styles.balanceText,
-                                        { color: isPositive ? "#4CAF50" : "#F44336" }
-                                    ]}
-                                >
-                                    ₹{item.balance.toLocaleString()}
-                                </ThemedText>
+                                <Icon name="savings" size={20} color="#3F51B5" />
+                                <View style={styles.detailTextContainer}>
+                                    <ThemedText style={styles.detailLabel}>Savings</ThemedText>
+                                    <ThemedText style={[styles.detailValue, { color: "#3F51B5" }]}>
+                                        ₹{savings.toLocaleString()}
+                                    </ThemedText>
+                                </View>
                             </View>
                         </View>
+                    </View>
+
+                    <View style={styles.balanceIndicator}>
+                        <Icon
+                            name={isPositive ? "trending-up" : "trending-down"}
+                            size={16}
+                            color={isPositive ? "#4CAF50" : "#F44336"}
+                        />
+                        <ThemedText style={[
+                            styles.balanceIndicatorText,
+                            { color: isPositive ? "#4CAF50" : "#F44336" }
+                        ]}>
+                            Balance: ₹{Math.abs(item.balance).toLocaleString()}
+                        </ThemedText>
                     </View>
                 </ThemedView>
             </ThemedView>
@@ -169,7 +249,7 @@ const BalanceList = () => {
             <LoaderSpinner shouldLoad={loading} />
             <View style={styles.content}>
                 {renderHeader()}
-                <FlatList 
+                <FlatList
                     data={groupedArray}
                     keyExtractor={(item) => `${item.month}-${item.year}`}
                     renderItem={renderBalanceCard}
@@ -206,57 +286,73 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     headerContent: {
-        padding: 20,
+        padding: 16,
     },
     headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 16,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 20,
         color: '#FFF',
-        opacity: 0.9,
-        fontWeight: '500',
-    },
-    balanceAmount: {
-        fontSize: 40,
         fontWeight: 'bold',
-        color: '#FFF',
-        marginVertical: 16,
     },
-    statsContainer: {
-        marginTop: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 12,
-        padding: 16,
-    },
-    statItem: {
+    // New styles for the cards row
+    cardsRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
+        justifyContent: 'space-between',
+        marginBottom: 16,
+        gap: 8,
     },
-    statContent: {
-        marginLeft: 12,
+    summaryCard: {
         flex: 1,
+        borderRadius: 10,
+        overflow: 'hidden',
     },
-    statLabel: {
-        fontSize: 14,
+    cardGradient: {
+        padding: 12,
+    },
+    cardInner: {
+        alignItems: 'center',
+    },
+    cardLabel: {
+        fontSize: 12,
         color: '#FFF',
         opacity: 0.9,
+        marginTop: 4,
     },
-    statValue: {
+    cardValue: {
         fontSize: 16,
         color: '#FFF',
         fontWeight: 'bold',
-        marginTop: 2,
+        marginTop: 4,
     },
-    divider: {
-        height: 1,
+    // Balance section
+    balanceSection: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        marginVertical: 8,
+        borderRadius: 12,
+        padding: 12,
     },
+    balanceLabel: {
+        fontSize: 14,
+        color: '#FFF',
+        opacity: 0.9,
+        textAlign: 'center',
+    },
+    balanceRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    balanceAmount: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginLeft: 8,
+    },
+    // Monthly card styles
     cardContainer: {
         marginBottom: 12,
         borderRadius: 12,
@@ -269,51 +365,62 @@ const styles = StyleSheet.create({
         },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
-        borderWidth: 2,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
     },
     card: {
         borderRadius: 12,
-        padding: 8,
+        padding: 0,
     },
-    cardContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-    },
-    monthYearContainer: {
-        width: '25%',
-        paddingRight: 8,
+    monthHeader: {
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
     },
     monthYear: {
-        fontSize: 14,
-        fontWeight: 500,
-        flexShrink: 1,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    cardContent: {
+        padding: 12,
     },
     detailsContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        width: '75%',
         justifyContent: 'space-between',
+        width: '100%',
     },
     detailItem: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        width: '33%',
         paddingHorizontal: 4,
     },
-    detailText: {
-        fontSize: 14,
-        marginLeft: 4,
-        flexShrink: 1,
-        textAlign: 'right',
+    detailTextContainer: {
+        marginLeft: 8,
+        flex: 1,
     },
-    balanceText: {
+    detailLabel: {
+        fontSize: 12,
+        opacity: 0.7,
+    },
+    detailValue: {
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    balanceIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        padding: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        borderTopWidth: 1,
+        borderTopColor: '#E0E0E0',
+    },
+    balanceIndicatorText: {
+        fontSize: 12,
+        fontWeight: 'bold',
         marginLeft: 4,
-        flexShrink: 1,
-        textAlign: 'right',
     },
     listContainer: {
         paddingBottom: 16,

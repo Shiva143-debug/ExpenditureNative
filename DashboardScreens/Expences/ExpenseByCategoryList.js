@@ -265,8 +265,6 @@ const ExpenseByCategoryList = () => {
       <ThemedView style={styles.cardContainer}>
         <LinearGradient colors={['#2C3E50', '#34495E']} style={styles.card}>
           <View style={styles.cardContent}>
-
-
             <View style={{ display: "flex", flexDirection: "row" }}>
               <View style={styles.iconContainer}>
                 <Icon name={iconName} size={32} color="#FFF" />
@@ -361,11 +359,7 @@ const ExpenseByCategoryList = () => {
       <View style={styles.listHeader}>
         <ThemedText style={styles.sectionTitle}>Expenses By Category</ThemedText>
         <TouchableOpacity onPress={toggleSort} style={styles.sortButton}>
-          <Icon
-            name={sortBy === 'amount' ? 'sort' : 'sort-by-alpha'}
-            size={24}
-            color="#666"
-          />
+          <Icon name={sortBy === 'amount' ? 'sort' : 'sort-by-alpha'} size={24} color="#666"/>
         </TouchableOpacity>
       </View>
 
@@ -499,13 +493,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   category: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#FFF',
     marginBottom: 4,
   },
   amount: {
-    fontSize: 16,
+    fontSize: 12,
     color: '#FFF',
   },
   listHeader: {

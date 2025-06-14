@@ -255,6 +255,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     marginBottom: 15,
     borderRadius: 8,
+    backgroundColor:"transparent"
   },
   dropdownList: {
     borderColor: '#ccc',
@@ -262,6 +263,7 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     fontSize: 16,
+    color:"gray"
   },
   input: {
     marginBottom: 15,

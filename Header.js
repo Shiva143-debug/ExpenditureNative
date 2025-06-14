@@ -1,48 +1,77 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { IconButton, Menu, Divider, Button } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import React, { useState, useContext } from 'react';
+import { StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useAuth } from './AuthContext';
+import ThemedView from './components/ThemedView';
+import ThemedText from './components/ThemedText';
+import { ThemeContext } from './context/ThemeContext';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const Header = ({ navigation }) => {
-     const { logout } = useAuth();
-  const [visible, setVisible] = useState(false);
+  const { logout } = useAuth();
+  const { theme } = useContext(ThemeContext);
 
-  const openMenu = () => setVisible(true);
-  const closeMenu = () => setVisible(false);
+  const iconColor = theme === 'dark' ? '#FFFFFF' : '#1976D2';
+  const gradientColors = theme === 'dark'
+    ? ['#1A237E', '#283593']
+    : ['#1976D2', '#42A5F5'];
 
-  const onLogout=()=> logout()
+  const confirmLogout = () => {
+    Alert.alert(
+      'Confirm Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'No',
+          onPress: () => {},
+          style: 'cancel',
+        },
+        {
+          text: 'Yes',
+          onPress: () => logout(),
+          style: 'destructive',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   return (
-    <View style={styles.headerContainer}>
-      <Icon name="menu" size={30} onPress={openMenu} style={styles.menuIcon}/>
-      <Menu visible={visible} onDismiss={closeMenu}
-       anchor={<Text onPress={openMenu}>.</Text>}>
-        <Menu.Item onPress={() => console.log("profile component")} title="Profile" />
-        <Divider />
-        <Menu.Item onPress={onLogout} title="Logout" />
-      </Menu>
-      <Text style={styles.headerTitle}>My App</Text>
-    </View>
+    <ThemedView style={styles.headerContainer}>
+      <LinearGradient
+        colors={gradientColors}
+        style={styles.headerGradient}
+      >
+        <ThemedText style={styles.headerTitle}>Expenditure</ThemedText>
+
+        <TouchableOpacity onPress={confirmLogout} style={styles.logoutButton}>
+          <Icon name="logout" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      </LinearGradient>
+    </ThemedView>
   );
 };
 
 const styles = StyleSheet.create({
   headerContainer: {
+    elevation: 3,
+    flex: 0,
+  },
+  headerGradient: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    elevation: 3, // Shadow effect on Android
-  },
-  menuIcon: {
-    marginRight: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  logoutButton: {
+    padding: 4,
   },
 });
 
