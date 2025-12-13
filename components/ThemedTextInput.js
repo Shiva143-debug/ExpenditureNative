@@ -29,12 +29,12 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   lightInput: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     color: '#000',
     borderColor: '#ccc',
   },
   darkInput: {
-    backgroundColor: '#1e1e1e',
+    backgroundColor: 'transparent',
     color: '#fff',
     borderColor: '#555',
   },

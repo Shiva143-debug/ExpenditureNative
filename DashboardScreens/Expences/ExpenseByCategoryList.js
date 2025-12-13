@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Dimensions, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
-import DropDownPicker from 'react-native-dropdown-picker';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Animated, Easing, Platform } from 'react-native';
 import { useAuth } from '../../AuthContext';
 import LoaderSpinner from '../../LoaderSpinner';
 import ThemedView from '../../components/ThemedView';
@@ -9,9 +8,11 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { getExpenseCosts } from "../../services/apiService"
 
+const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
+
 const ExpenseByCategoryList = () => {
   const { id } = useAuth();
-  const [year, setYear] = useState(new Date().getFullYear().toString());
+  const [year] = useState(new Date().getFullYear().toString());
   const [expenses, setExpenses] = useState([]);
   const [groupedExpenses, setGroupedExpenses] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -22,12 +23,27 @@ const ExpenseByCategoryList = () => {
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
 
   const [openYear, setOpenYear] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownOpacity = useRef(new Animated.Value(0)).current;
+  const dropdownScale = useRef(new Animated.Value(0.95)).current;
+  const dropdownTranslate = useRef(new Animated.Value(-8)).current;
+  const arrowAnimation = useRef(new Animated.Value(0)).current;
   const [Year, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [years, setYears] = useState([
+  const [years] = useState([
     { label: '2024', value: '2024', icon: 'event-available' },
     { label: '2025', value: '2025', icon: 'event-available' },
     { label: '2026', value: '2026', icon: 'event-available' },
   ]);
+  const headerReveal = useRef(new Animated.Value(0)).current;
+  const headerScale = headerReveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.95, 1],
+  });
+  const headerOpacity = headerReveal;
+  const headerTranslate = headerReveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 0],
+  });
 
   // Category to icon mapping
   const categoryIcons = {
@@ -205,7 +221,16 @@ const ExpenseByCategoryList = () => {
 
   useEffect(() => {
     getExpensesByYear();
-  }, [year]);
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(headerReveal, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   useEffect(() => {
     const filteredTotalCostData = expenses.filter(
@@ -248,6 +273,63 @@ const ExpenseByCategoryList = () => {
     setTotalAmount(total);
   }, [Year, expenses, sortBy, sortOrder]);
 
+  useEffect(() => {
+    Animated.timing(arrowAnimation, {
+      toValue: openYear ? 1 : 0,
+      duration: 240,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+
+    if (openYear) {
+      Animated.parallel([
+        Animated.spring(dropdownScale, {
+          toValue: 1,
+          bounciness: 6,
+          speed: 12,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownOpacity, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.spring(dropdownTranslate, {
+          toValue: 0,
+          bounciness: 6,
+          speed: 12,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (showDropdown) {
+      Animated.parallel([
+        Animated.timing(dropdownScale, {
+          toValue: 0.95,
+          duration: 150,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownOpacity, {
+          toValue: 0,
+          duration: 150,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownTranslate, {
+          toValue: -8,
+          duration: 150,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) {
+          setShowDropdown(false);
+        }
+      });
+    }
+  }, [openYear, showDropdown]);
+
   const toggleSort = () => {
     if (sortBy === 'amount') {
       setSortBy('name');
@@ -258,31 +340,81 @@ const ExpenseByCategoryList = () => {
     }
   };
 
-  const renderItem = ({ item }) => {
+  const handleToggleDropdown = () => {
+    const next = !openYear;
+    if (next) {
+      setShowDropdown(true);
+    }
+    setOpenYear(next);
+  };
+
+  const handleSelectYear = (value) => {
+    setSelectedYear(value);
+    setOpenYear(false);
+  };
+
+  const arrowRotation = arrowAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  const AnimatedExpenseCard = ({ item, index }) => {
     const iconName = getIconForCategory(item.category);
+    const cardTranslateY = useRef(new Animated.Value(12)).current;
+    const cardOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      Animated.parallel([
+        Animated.timing(cardTranslateY, {
+          toValue: 0,
+          duration: 400,
+          delay: index * 60,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardOpacity, {
+          toValue: 1,
+          duration: 400,
+          delay: index * 60,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, [index]);
 
     return (
-      <ThemedView style={styles.cardContainer}>
-        <LinearGradient colors={['#2C3E50', '#34495E']} style={styles.card}>
-          <View style={styles.cardContent}>
-            <View style={{ display: "flex", flexDirection: "row" }}>
-              <View style={styles.iconContainer}>
-                <Icon name={iconName} size={32} color="#FFF" />
+      <Animated.View
+        style={{
+          transform: [{ translateY: cardTranslateY }],
+          opacity: cardOpacity,
+        }}
+      >
+        <ThemedView style={styles.cardContainer}>
+          <LinearGradient colors={['#2C3E50', '#34495E']} style={styles.card}>
+            <View style={styles.cardContent}>
+              <View style={{ display: "flex", flexDirection: "row" }}>
+                <View style={styles.iconContainer}>
+                  <Icon name={iconName} size={32} color="#FFF" />
+                </View>
+                <View>
+                  <ThemedText style={styles.category}>{item.category}</ThemedText>
+                  <ThemedText style={styles.amount}>₹{item.TotalCost.toLocaleString()}</ThemedText>
+                </View>
               </View>
-              <View>
-                <ThemedText style={styles.category}>{item.category}</ThemedText>
-                <ThemedText style={styles.amount}>₹{item.TotalCost.toLocaleString()}</ThemedText>
-              </View>
+
+              <ThemedText style={styles.percentage}>{item.percentage}%</ThemedText>
+
             </View>
 
-            <ThemedText style={styles.percentage}>{item.percentage}%</ThemedText>
-
-          </View>
-
-        </LinearGradient>
-      </ThemedView>
+          </LinearGradient>
+        </ThemedView>
+      </Animated.View>
     );
   };
+
+  const renderItem = ({ item, index }) => (
+    <AnimatedExpenseCard item={item} index={index} />
+  );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -306,33 +438,74 @@ const ExpenseByCategoryList = () => {
     <ThemedView style={styles.container}>
       <LoaderSpinner shouldLoad={loading} />
 
+      <Animated.View
+        style={[
+          styles.headerCardWrapper,
+          {
+            opacity: headerOpacity,
+            transform: [
+              { translateY: headerTranslate },
+              { scale: headerScale },
+            ],
+          },
+        ]}
+      >
+        <AnimatedGradient
+          colors={['#0f9b0f', '#06beb6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradientCard}
+        >
+          <View style={styles.headerTopRow}>
+            <View>
+              <ThemedText style={styles.headerTitle}>Total Expenses</ThemedText>
+              <ThemedText style={styles.headerSubtitle}>Yearly overview</ThemedText>
+            </View>
+            <View style={styles.headerIconBadge}>
+              <Icon name="stacked-line-chart" size={24} color="#FFFFFF" />
+            </View>
+          </View>
+          <View style={styles.headerAmountRow}>
+            <ThemedText style={styles.headerAmount}>₹{totalAmount.toLocaleString()}</ThemedText>
+            <View style={styles.headerYearChip}>
+              <Icon name="event" size={16} color="#1B5E20" />
+              <ThemedText style={styles.headerYearLabel}>{Year}</ThemedText>
+            </View>
+          </View>
+        </AnimatedGradient>
+      </Animated.View>
+
       <TouchableOpacity
         style={[
-          styles.headerContainer,
-          { marginBottom: openYear ? 0 : 16 }
+          styles.yearSelectorTrigger,
+          openYear && styles.yearSelectorTriggerActive
         ]}
-        onPress={() => setOpenYear(!openYear)}
+        onPress={handleToggleDropdown}
+        activeOpacity={0.85}
       >
-        <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.headerGradient}>
-          <View style={styles.balanceContainer}>
-            <ThemedText style={styles.balanceLabel}>
-              Total Expenses in {Year}
-            </ThemedText>
-            <ThemedText style={styles.balanceAmount}>
-              ₹{totalAmount.toLocaleString()}
-            </ThemedText>
-            <Icon
-              name={openYear ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-              size={24}
-              color="#FFF"
-              style={styles.dropdownIcon}
-            />
-          </View>
-        </LinearGradient>
+        <View style={styles.yearSelectorInner}>
+          <Icon name="calendar-month" size={20} color="#2E7D32" />
+          <ThemedText style={styles.yearSelectorText}>{Year}</ThemedText>
+          <Animated.View style={{ transform: [{ rotate: arrowRotation }] }}>
+            <Icon name="keyboard-arrow-down" size={22} color="#2E7D32" />
+          </Animated.View>
+        </View>
       </TouchableOpacity>
 
-      {openYear && (
-        <View style={styles.dropdownList}>
+      {showDropdown && (
+        <Animated.View
+          style={[
+            styles.dropdownList,
+            {
+              opacity: dropdownOpacity,
+              transform: [
+                { translateY: dropdownTranslate },
+                { scale: dropdownScale },
+              ],
+            },
+          ]}
+          pointerEvents={openYear ? 'auto' : 'none'}
+        >
           {years.map((item) => (
             <TouchableOpacity
               key={item.value}
@@ -340,10 +513,7 @@ const ExpenseByCategoryList = () => {
                 styles.dropdownItem,
                 Year === item.value && styles.dropdownItemSelected
               ]}
-              onPress={() => {
-                setSelectedYear(item.value);
-                setOpenYear(false);
-              }}
+              onPress={() => handleSelectYear(item.value)}
             >
               <ThemedText style={[
                 styles.dropdownItemText,
@@ -353,7 +523,7 @@ const ExpenseByCategoryList = () => {
               </ThemedText>
             </TouchableOpacity>
           ))}
-        </View>
+        </Animated.View>
       )}
 
       <View style={styles.listHeader}>
@@ -390,74 +560,139 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  headerContainer: {
-    borderRadius: 12,
+  headerCardWrapper: {
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 4,
+    elevation: 6,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    marginBottom: 20,
   },
-  headerGradient: {
-    padding: 20,
+  headerGradientCard: {
+    padding: 24,
+    borderRadius: 20,
   },
-  balanceContainer: {
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    position: 'relative',
   },
-  balanceLabel: {
+  headerTitle: {
     fontSize: 18,
-    color: '#FFF',
-    opacity: 0.9,
-    marginBottom: 8,
+    color: '#E8F5E9',
+    fontWeight: '600',
   },
-  balanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 4,
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#C8E6C9',
+    marginTop: 4,
   },
-  dropdownIcon: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
+  headerIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerAmountRow: {
+    marginTop: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerAmount: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  headerYearChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  headerYearLabel: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1B5E20',
+  },
+  yearSelectorTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A5D6A7',
+    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: Platform.OS === 'ios' ? 10 : 4,
+    },
+    shadowOpacity: Platform.OS === 'ios' ? 0.12 : 0.2,
+    shadowRadius: Platform.OS === 'ios' ? 12 : 6,
+    elevation: Platform.OS === 'android' ? 4 : 0,
+  },
+  yearSelectorTriggerActive: {
+    backgroundColor: '#E8F5E9',
+  },
+  yearSelectorInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  yearSelectorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E7D32',
+    marginHorizontal: 8,
   },
   dropdownList: {
     backgroundColor: '#FFF',
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E8F5E9',
     overflow: 'hidden',
+    paddingVertical: 6,
   },
   dropdownItem: {
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#F1F8E9',
   },
   dropdownItemSelected: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#F1F8E9',
   },
   dropdownItemText: {
     fontSize: 16,
-    color: '#424242',
+    color: '#2E7D32',
     textAlign: 'center',
+    fontWeight: '500',
   },
   dropdownItemTextSelected: {
-    color: '#4CAF50',
-    fontWeight: '600',
+    color: '#1B5E20',
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: 20,

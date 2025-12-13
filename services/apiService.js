@@ -102,14 +102,6 @@ export const getCategoryReport = async (userId) => {
 // ==================== PRODUCT RELATED API CALLS ====================
 
 
-export const getProducts = async (userId, category) => {
-  try {
-    const response = await api.get(`/products?category=${category}&user_id=${userId}`);
-    return response.data;
-  } catch (error) {
-    handleError(error, 'Error fetching products');
-  }
-};
 
 
 export const addProduct = async (userId, category, product) => {
@@ -117,7 +109,7 @@ export const addProduct = async (userId, category, product) => {
     const response = await api.post('/addproduct', {
       id: userId,
       category,
-      product
+      product,
     });
     return response.data;
   } catch (error) {
@@ -239,6 +231,72 @@ export const addSaving = async (savingData) => {
   }
 };
 
+// ==================== SOURCE/INCOME DELETE API CALL ====================
+
+export const deleteSource = async (sourceId, userId) => {
+  try {
+    const response = await api.delete(`/deleteSource/${sourceId}/${userId}`);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'Error deleting source');
+  }
+};
+
+// ==================== PRODUCT DELETE API CALL ====================
+
+export const deleteProduct = async (productId, userId) => {
+  try {
+    const response = await api.delete(`/deleteProducts/${productId}/${userId}`);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'Error deleting product');
+  }
+};
+
+// ==================== CATEGORY DELETE API CALL ====================
+
+export const deleteCategory = async (categoryId, userId) => {
+  try {
+    const response = await api.delete(`/deleteCategories/${categoryId}/${userId}`);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'Error deleting category');
+  }
+};
+
+// ==================== EXPENSE DELETE API CALL ====================
+
+export const deleteExpense = async (expenseId, userId) => {
+  try {
+    const response = await api.delete(`/deleteExpence/${expenseId}/${userId}`);
+    return response.data;
+  } catch (error) {
+    handleError(error, 'Error deleting expense');
+  }
+};
+
+// ==================== CATEGORIES AND PRODUCTS COMBINED API CALL ====================
+export const getProducts = async (userId, categoryName) => {
+  try {
+    const response = await api.get(`/products?category=${categoryName}&user_id=${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    throw error;
+  }
+};
+
+
+export const getAllCategoriesAndProducts = async (userId) => {
+  try {
+    const response = await api.get(`/getCategoriesAndProducts/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching categories and products:', error);
+    throw error;
+  }
+};
+
 // Export a default object with all API functions
 export default {
   // Expense related
@@ -255,12 +313,16 @@ export default {
   getProducts,
   addProduct,
 
+  // Categories and Products combined
+  getAllCategoriesAndProducts,
+
   // Source/Income related
   getIncomeSources,
   getAllSourceData,
   getDefaultSources,
   addSource,
   addDefaultSource,
+  deleteSource,
 
   // User related
   registerUser,
@@ -270,5 +332,10 @@ export default {
   getSavingsData,
   getSavingsDataByMonthYear,
   deleteSaving,
-  addSaving
+  addSaving,
+
+  // Delete related
+  deleteExpense,
+  deleteProduct,
+  deleteCategory,
 };

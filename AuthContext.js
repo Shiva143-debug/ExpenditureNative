@@ -7,6 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [id, setId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   useEffect(() => {
     const loadAuthData = async () => {
@@ -35,6 +36,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setIsAuthenticated(false);
     setId(null);
+    setInitialDataLoaded(false);
     await AsyncStorage.removeItem('userId');
   };
 
@@ -43,7 +45,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ id, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ id, isAuthenticated, login, logout, initialDataLoaded, setInitialDataLoaded }}>
       {children}
     </AuthContext.Provider>
   );

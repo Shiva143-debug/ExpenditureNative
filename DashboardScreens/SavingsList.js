@@ -1,31 +1,173 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import ThemedText from "../components/ThemedText";
 import ThemedView from "../components/ThemedView";
 import ThemedTextInput from "../components/ThemedTextInput";
 import ThemedTextAreaInput from "../components/ThemedTextAreaInput";
 import { getSavingsData, deleteSaving, addSaving } from "../services/apiService";
-import { StyleSheet, FlatList, View, TouchableOpacity, Alert, Modal, Platform } from "react-native";
+import { StyleSheet, FlatList, View, TouchableOpacity, Alert, Modal, Platform, Animated, Text } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../AuthContext";
 import LoaderSpinner from "../LoaderSpinner";
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Toast from "react-native-toast-message";
+import { ThemeContext } from "../context/ThemeContext";
+
+const savingsPalette = {
+  light: {
+    header: ['#cffafe', '#a5f3fc'],
+    accent: '#0e4f5f',
+    accentSoft: '#4a9ca7',
+    surface: '#ecfeff',
+    cardShadow: '#00000022',
+    iconGlow: 'rgba(14, 79, 95, 0.28)',
+    emptyIcon: '#94a3b8',
+    cardGradient: ['#4a9ca7', '#3d8db3ff'],
+    cardAccent: '#0f172a',
+  },
+  dark: {
+    header: ['#0f172a', '#0e7490'],
+    accent: '#38bdf8',
+    accentSoft: '#67e8f9',
+    surface: '#071524',
+    cardShadow: '#00000055',
+    iconGlow: 'rgba(56, 189, 248, 0.35)',
+    emptyIcon: '#475569',
+    cardGradient: ['#0f172a', '#0e7490'],
+    cardAccent: '#e2e8f0',
+  },
+};
+
+const AnimatedSavingsCard = ({ item, index, onDelete, onEdit, palette }) => {
+  const translateY = useRef(new Animated.Value(30)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const deleteScaleAnim = useRef(new Animated.Value(1)).current;
+  const editScaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [index]);
+
+  const handleDeletePress = () => {
+    Animated.sequence([
+      Animated.timing(deleteScaleAnim, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(deleteScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onDelete?.(item.id));
+  };
+
+  const handleEditPress = () => {
+    Animated.sequence([
+      Animated.timing(editScaleAnim, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(editScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onEdit?.(item));
+  };
+
+  return (
+    <Animated.View style={[{ transform: [{ translateY }], opacity: opacityAnim }]}>    
+      <LinearGradient colors={palette.cardGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.cardWrapper, { shadowColor: palette.cardShadow }]}> 
+        <TouchableOpacity activeOpacity={0.82} onPress={() => onEdit?.(item)} style={styles.gradientTouchable}>
+          <View style={styles.cardContent}>
+            <View style={styles.leftSection}>
+              <View style={[styles.iconBadge, { backgroundColor: `${palette.cardAccent}22` }]}>
+                <Icon name="savings" size={32} color={palette.cardAccent} />
+              </View>
+              <View style={styles.savingDetails}>
+                <ThemedText style={[styles.savingLabel, { color: palette.cardAccent }]}>
+                  {item.note || 'Savings'}
+                </ThemedText>
+                <View style={styles.dateRow}>
+                  <Icon name="event" size={13} color={`${palette.cardAccent}cc`} />
+                  <Text style={[styles.dateValue, { color: `${palette.cardAccent}cc` }]}> {item.date}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.rightSection}>
+              <ThemedText style={[styles.amountValue, { color: palette.cardAccent }]}>
+                ₹{parseFloat(item.amount).toLocaleString('en-IN')}
+              </ThemedText>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
+                  <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }] }>
+                    <Icon name="edit" size={18} color={palette.cardAccent} />
+                  </Animated.View>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
+                  <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }] }>
+                    <Icon name="delete" size={18} color="#dc2626" />
+                  </Animated.View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </LinearGradient>
+    </Animated.View>
+  );
+};
 
 const SavingsList = () => {
     const { id } = useAuth();
+    const { theme } = useContext(ThemeContext);
     const [savings, setSavings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchText, setSearchText] = useState('');
+    const [filteredSavings, setFilteredSavings] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [amount, setAmount] = useState("");
     const [note, setNote] = useState("");
     const [date, setDate] = useState('');
+    const palette = theme === 'dark' ? savingsPalette.dark : savingsPalette.light;
 
     const [showDatePicker, setShowDatePicker] = useState(false);
 
-    useEffect(() => {
-        fetchData();
-    }, [id]);
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchData();
+        }, [id])
+    );
+
+    // Filter savings based on search text
+    React.useEffect(() => {
+        if (searchText.trim() === '') {
+            setFilteredSavings(savings);
+        } else {
+            const lowerSearch = searchText.toLowerCase();
+            setFilteredSavings(savings.filter(item =>
+                (item.note || '').toLowerCase().includes(lowerSearch) ||
+                (item.amount || '').toString().includes(lowerSearch)
+            ));
+        }
+    }, [savings, searchText]);
 
     const fetchData = async () => {
         setLoading(true)
@@ -84,25 +226,29 @@ const SavingsList = () => {
     const totalSavings = savings.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
 
     const renderHeader = () => (
-        <ThemedView style={styles.headerContainer}>
-            <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.headerGradient}>
-                <View style={styles.headerContent}>
-                    <View style={styles.headerTitleContainer}>
-                        <ThemedText style={styles.headerTitle}>Savings List</ThemedText>
-                        <TouchableOpacity
-                            style={styles.addButton}
-                            onPress={() => setModalVisible(true)}
-                        >
-                            <Icon name="add-circle" size={28} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.headerAmount}>
-                        <ThemedText style={styles.totalLabel}>Total Savings</ThemedText>
-                        <ThemedText style={styles.totalAmount}> ₹{totalSavings.toLocaleString()}</ThemedText>
-                    </View>
-                </View>
-            </LinearGradient>
-        </ThemedView>
+        <LinearGradient colors={palette.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+          <View style={styles.headerTopRow}>
+            <View>
+              <ThemedText style={[styles.headerTitle, { color: palette.accent }]}>Savings</ThemedText>
+              <ThemedText style={[styles.headerSubtitle, { color: palette.accentSoft }]}>Manage your savings</ThemedText>
+            </View>
+            <Icon name="savings" size={40} color={palette.accent} />
+          </View>
+          <View style={[styles.totalCard, { backgroundColor: palette.iconGlow }]}>
+            <View style={styles.totalCardContent}>
+              <View>
+                <ThemedText style={[styles.totalLabel, { color: palette.accentSoft }]}>Total Savings</ThemedText>
+                <ThemedText style={[styles.totalAmount, { color: palette.accent }]}>₹{totalSavings.toLocaleString('en-IN')}</ThemedText>
+              </View>
+              <TouchableOpacity
+                style={styles.addButtonHeader}
+                onPress={() => setModalVisible(true)}
+              >
+                <Icon name="add-circle" size={48} color={palette.accent} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
     );
 
     const onDeleteSaving = (savingId) => {
@@ -137,39 +283,42 @@ const SavingsList = () => {
         );
     };
 
-    const renderItem = ({ item }) => (
-        <ThemedView style={styles.card}>
-            <ThemedView style={styles.cardInner}>
-                <View style={styles.cardTopRow}>
-                    <ThemedText style={styles.dateText}>{item.date}</ThemedText>
-                    <ThemedText style={styles.amountText}>₹{parseFloat(item.amount).toLocaleString()}</ThemedText>
-                </View>
-                <View style={styles.cardTopRow}>
-                    {item.note ? (<ThemedText style={styles.noteText}>{item.note}</ThemedText>) : <ThemedText>Not Provided</ThemedText>}
-                    <View style={{ flexDirection: 'row' }}>
-                        <TouchableOpacity onPress={() => console.log('Edit')}>
-                            <Icon name="edit" size={20} color="#4CAF50" />
-                        </TouchableOpacity>
+    const onEditSaving = (item) => {
+        console.log('Edit saving:', item);
+    };
 
-                        <TouchableOpacity onPress={() => onDeleteSaving(item.id)}>
-                            <Icon name="delete" size={20} color="#F44336" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </ThemedView>
-        </ThemedView>
+    const renderItem = ({ item, index }) => (
+        <AnimatedSavingsCard  item={item} 
+            index={index} onDelete={onDeleteSaving} onEdit={onEditSaving} palette={palette}
+        />
     );
 
 
     return (
-        <ThemedView style={styles.container}>
+        <ThemedView style={[styles.container, { backgroundColor: palette.surface }]}>
             <Toast />
             <LoaderSpinner shouldLoad={loading} />
             <View style={styles.headerSection}>
                 {renderHeader()}
             </View>
-            <FlatList data={savings} keyExtractor={(item) => item.id.toString()}
-                renderItem={renderItem} contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false} />
+            <View style={styles.searchSection}>
+                <ThemedTextInput
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    placeholder="Search notes or amounts..."
+                    style={styles.searchInput}
+                />
+            </View>
+            <FlatList
+                data={filteredSavings}  keyExtractor={(item) => item.id.toString()} renderItem={renderItem} 
+                contentContainerStyle={styles.listContainer}  showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Icon name="savings" size={48}  />
+                        <ThemedText style={styles.emptyText}>No savings yet</ThemedText>
+                    </View>
+                }
+            />
 
             {/* Add Saving Modal */}
             <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
@@ -221,9 +370,159 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    headerSection: {
+        zIndex: 1,
+        paddingHorizontal: 6,
+        paddingTop: 12,
+        paddingBottom: 16,
+    },
+    searchSection: {
+        paddingHorizontal: 16,
+        paddingBottom: 8,
+    },
+    searchInput: {
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    },
+    headerGradient: {
+        borderRadius: 20,
+        padding: 24,
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+    },
+    headerTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 20,
+    },
+    headerTitle: {
+        fontSize: 28,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    headerSubtitle: {
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    totalCard: {
+        borderRadius: 14,
+        padding: 16,
+    },
+    totalCardContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    totalLabel: {
+        fontSize: 13,
+        fontWeight: '500',
+        marginBottom: 6,
+    },
+    totalAmount: {
+        fontSize: 28,
+        fontWeight: '700',
+    },
+    addButtonHeader: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     listContainer: {
-        padding: 15,
-        paddingTop: 5,
+        padding: 6,
+        paddingTop: 8,
+    },
+    cardWrapper: {
+        marginBottom: 14,
+        borderRadius: 16,
+        overflow: 'hidden',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    gradientCard: {
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    gradientTouchable: {
+        flex: 1,
+        borderRadius: 16,
+    },
+    cardContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+    },
+    leftSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    iconBadge: {
+        width: 52,
+        height: 52,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+        color:"#ffffff"
+    },
+    savingDetails: {
+        flex: 1,
+    },
+    savingLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    dateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    dateValue: {
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    rightSection: {
+        marginLeft: 12,
+        alignItems: 'flex-end',
+    },
+    amountValue: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 8,
+    },
+    actionButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    editButton: {
+        padding: 6,
+    },
+    deleteButton: {
+        padding: 6,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    emptyText: {
+        fontSize: 16,
+        fontWeight: '500',
+        marginTop: 12,
+        opacity: 0.6,
     },
     dateButton: {
         padding: 15,
@@ -235,149 +534,6 @@ const styles = StyleSheet.create({
     dateButtonText: {
         fontSize: 16,
         textAlign: 'center',
-    },
-    headerSection: {
-        // paddingTop: 5,
-        zIndex: 1,
-        height: 100,
-        marginBottom: 5,
-    },
-    headerContainer: {
-        height: 50,
-    },
-    headerGradient: {
-        borderRadius: 15,
-        margin: 15,
-        padding: 20,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        height: '100%',
-    },
-    headerContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 10,
-    },
-    headerTitleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
-        marginBottom: 4,
-        marginRight: 10,
-    },
-    headerSubtitle: {
-        fontSize: 16,
-        color: '#fff',
-        opacity: 0.9,
-    },
-    headerAmount: {
-        alignItems: 'flex-end',
-        paddingRight: 5,
-    },
-    totalLabel: {
-        fontSize: 14,
-        color: '#fff',
-        opacity: 0.9,
-        marginBottom: 4,
-    },
-    totalAmount: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-
-    card: {
-        marginTop: 5,
-        marginBottom: 10,
-        borderRadius: 12,
-    },
-
-    cardInner: {
-        padding: 15,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-    },
-    sourceInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    textContainer: {
-        flex: 1,
-    },
-    amountContainer: {
-        paddingLeft: 15,
-    },
-    iconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-
-    center: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-    },
-    heading: {
-        fontSize: 24,
-        fontWeight: "bold",
-        marginBottom: 12,
-    },
-    noData: {
-        fontSize: 16,
-        color: "#666",
-        marginTop: 20,
-    },
-    list: {
-        paddingBottom: 20,
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: "600",
-    },
-    amount: {
-        fontSize: 16,
-        color: "#007AFF",
-        marginTop: 4,
-    },
-    date: {
-        fontSize: 14,
-        color: "#888",
-        marginTop: 2,
-    },
-    cardTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    dateText: {
-        fontSize: 14,
-    },
-    amountText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#4CAF50',
-    },
-    noteText: {
-        fontSize: 15,
-        marginTop: 4,
-        lineHeight: 20,
-        maxWidth: '70%',
     },
 
     // Modal styles
@@ -431,13 +587,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     cancelButton: {
-        backgroundColor: 'gray',
+        backgroundColor: '#ccc',
     },
     addButton: {
-        backgroundColor: '#4CAF50',
+        backgroundColor: '#0e4f5f',
     },
     buttonText: {
         fontSize: 16,
+        color: '#333',
     },
     addButtonText: {
         fontSize: 16,

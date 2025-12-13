@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { Platform, FlatList, TouchableOpacity, StyleSheet, View, Alert, PermissionsAndroid } from 'react-native';
+import React, { useEffect, useState, useContext, useMemo, useRef } from 'react';
+import { FlatList, TouchableOpacity, StyleSheet, View, Alert, Animated, Platform } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../AuthContext';
@@ -10,6 +10,8 @@ import LoaderSpinner from '../LoaderSpinner';
 import { getFilteredExpenses } from '../services/apiService';
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
 import Share from 'react-native-share';
+import RNFS from 'react-native-fs';
+import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { ThemeContext } from '../context/ThemeContext';
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,12 +21,82 @@ const monthNames = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+const TransactionCard = ({ item, index, palette }) => {
+    const translateY = useRef(new Animated.Value(24)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: 0,
+                duration: 500,
+                delay: index * 60,
+                useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+                toValue: 1,
+                duration: 500,
+                delay: index * 60,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [index, opacity, translateY]);
+
+    const gradient = palette.cardGradients[index % palette.cardGradients.length];
+
+    return (
+        <Animated.View style={[styles.transactionCardWrapper, { opacity, transform: [{ translateY }] }]}>
+            <LinearGradient colors={gradient} style={[styles.transactionCard, { borderColor: palette.cardBorder }]}>
+                <View style={styles.transactionHeader}>
+                    <View style={styles.categoryDateRow}>
+                        <View style={[styles.transactionChip, { backgroundColor: palette.chipBackground }]}>
+                            <Icon name="category" size={16} color={palette.chipText} />
+                            <ThemedText style={[styles.transactionChipText, { color: palette.chipText }]} numberOfLines={1}>
+                                {item.category || 'Uncategorized'}
+                            </ThemedText>
+                        </View>
+                        <ThemedText style={[styles.transactionDate, { color: '#ffffff' }]}>
+                            {item.p_date || '—'}
+                        </ThemedText>
+                    </View>
+                    <View style={styles.productCostRow}>
+                        <ThemedText style={[styles.transactionProduct, { color: palette.textPrimary }]} numberOfLines={1}>
+                            {item.product || 'Unnamed purchase'}
+                        </ThemedText>
+                        <ThemedText style={[styles.transactionAmount, { color: palette.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+                            ₹{(parseFloat(item.cost) || 0).toLocaleString('en-IN')}
+                        </ThemedText>
+                    </View>
+                </View>
+                <View style={[styles.transactionBody, { borderColor: palette.cardBorder }]}>
+                    {parseFloat(item.tax_amount) > 0 && (
+                        <View style={styles.transactionDetailRow}>
+                            <Icon name="receipt-long" size={16} color={palette.textSecondary} style={styles.transactionDetailIcon} />
+                            <ThemedText style={[styles.transactionDetailText, { color: palette.textSecondary }]}>
+                                Tax ₹{(parseFloat(item.tax_amount) || 0).toLocaleString('en-IN')}
+                            </ThemedText>
+                        </View>
+                    )}
+                    {item.description ? (
+                        <View style={styles.transactionDetailRow}>
+                            <Icon name="description" size={16} color={palette.textSecondary} style={styles.transactionDetailIcon} />
+                            <ThemedText style={[styles.transactionDetailText, { color: palette.textSecondary }]} numberOfLines={2}>
+                                {item.description}
+                            </ThemedText>
+                        </View>
+                    ) : null}
+                </View>
+            </LinearGradient>
+        </Animated.View>
+    );
+};
+
 const TransactionReports = () => {
     const { id } = useAuth();
     const { theme } = useContext(ThemeContext);
     const [expenceData, setExpenceData] = useState([]);
-    const [filteredData, setFilteredData] = useState([]);
     const [searchText, setSearchText] = useState('');
+    const [debouncedSearchText, setDebouncedSearchText] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -46,12 +118,66 @@ const TransactionReports = () => {
     const [Month, setMonth] = useState(currentMonth);
     const [Year, setYear] = useState(currentYear);
 
-    // Define colors based on theme
-    const iconColor = theme === 'dark' ? '#FFFFFF' : '#1976D2';
-    const cardBorderColor = theme === 'dark' ? '#444444' : '#E0E0E0';
-    const gradientColors = theme === 'dark'
-        ? ['#1A237E', '#283593']
-        : ['#1976D2', '#42A5F5'];
+    const palette = useMemo(() => theme === 'dark'
+        ? {
+            background: '#0f172a',
+            headerGradient: ['#0f172a', '#1e293b'],
+            headerAccent: '#38bdf8',
+            searchBackground: 'rgba(148, 163, 184, 0.16)',
+            searchBorder: 'rgba(148, 163, 184, 0.28)',
+            searchPlaceholder: '#94a3b8',
+            iconColor: '#38bdf8',
+            summaryGradients: [
+                ['#f97316', '#fb7185'],
+                ['#22d3ee', '#0284c7'],
+                ['#34d399', '#059669'],
+                ['#a855f7', '#6366f1'],
+            ],
+            summaryText: '#f8fafc',
+            cardGradients: [
+                ['#1f2937', '#111827'],
+                ['#1e293b', '#0f172a'],
+                ['#1d4ed8', '#1e293b'],
+                ['#0f172a', '#0b1120'],
+            ],
+            cardBorder: 'rgba(148, 163, 184, 0.16)',
+            textPrimary: '#e2e8f0',
+            textSecondary: '#94a3b8',
+            chipBackground: 'rgba(56, 189, 248, 0.12)',
+            chipText: '#bae6fd',
+            downloadGradient: ['#38bdf8', '#0ea5e9'],
+            emptyIcon: '#38bdf8',
+        }
+        : {
+            background: '#f5f7fb',
+            headerGradient: ['#2563eb', '#7c3aed'],
+            headerAccent: '#1d4ed8',
+            searchBackground: 'rgba(255, 255, 255, 0.95)',
+            searchBorder: 'rgba(59, 130, 246, 0.2)',
+            searchPlaceholder: '#64748b',
+            iconColor: '#2563eb',
+            summaryGradients: [
+                ['#f97316', '#fb923c'],
+                ['#0ea5e9', '#38bdf8'],
+                ['#22c55e', '#4ade80'],
+                ['#6366f1', '#8b5cf6'],
+            ],
+            summaryText: '#ffffff',
+            cardGradients: [
+                ['#ffffff', '#f8fafc'],
+                ['#fff7ed', '#ffedd5'],
+                ['#ecfeff', '#cffafe'],
+                ['#ede9fe', '#ddd6fe'],
+            ],
+            cardBorder: 'rgba(15, 23, 42, 0.08)',
+            textPrimary: '#0f172a',
+            textSecondary: '#475569',
+            chipBackground: 'rgba(99, 102, 241, 0.12)',
+            chipText: '#4338ca',
+            downloadGradient: ['#2563eb', '#7c3aed'],
+            emptyIcon: '#2563eb',
+        }
+    );
 
     // Reset showFilters when navigating away and coming back
     useFocusEffect(
@@ -65,12 +191,23 @@ const TransactionReports = () => {
         fetchExpenseData();
     }, [id, Month, Year]);
 
+    // Debounce search text
+    useEffect(() => {
+        if (searchText === '') {
+            setDebouncedSearchText('');
+        } else {
+            const timeout = setTimeout(() => {
+                setDebouncedSearchText(searchText);
+            }, 1000);
+            return () => clearTimeout(timeout);
+        }
+    }, [searchText]);
+
     const fetchExpenseData = async () => {
         try {
             setLoading(true);
             const data = await getFilteredExpenses(id, Month, Year);
             setExpenceData(data);
-            setFilteredData(data);
             setShowFilters(false);
         } catch (error) {
             console.error('Error fetching expense data:', error);
@@ -82,25 +219,17 @@ const TransactionReports = () => {
 
     const handleSearch = (text) => {
         setSearchText(text);
-        filterAll(text);
     };
 
-
-    const filterAll = (search, month, year, selectedDate) => {
-        const filtered = expenceData.filter(item => {
-            const matchesSearch = item?.category?.toLowerCase().includes(search.toLowerCase()) ||
-                item?.description?.toLowerCase().includes(search.toLowerCase()) ||
-                item?.product?.toLowerCase().includes(search.toLowerCase());
-
-            const matchesMonth = month ? parseInt(item.month) === parseInt(month) : true;
-            const matchesYear = year ? parseInt(item.year) === parseInt(year) : true;
-            const matchesDate = selectedDate ? item.p_date === selectedDate : true;
-
-            return matchesSearch && matchesMonth && matchesYear && matchesDate;
+    const filteredData = useMemo(() => {
+        if (!debouncedSearchText) return expenceData;
+        return expenceData.filter(item => {
+            const matchesSearch = item?.category?.toLowerCase().includes(debouncedSearchText.toLowerCase()) ||
+                item?.description?.toLowerCase().includes(debouncedSearchText.toLowerCase()) ||
+                item?.product?.toLowerCase().includes(debouncedSearchText.toLowerCase());
+            return matchesSearch;
         });
-
-        setFilteredData(filtered);
-    };
+    }, [debouncedSearchText, expenceData]);
 
 
     const handleDownload = async () => {
@@ -253,17 +382,29 @@ const TransactionReports = () => {
                 const file = await RNHTMLtoPDF.convert(options);
                 console.log('PDF generated successfully:', file);
 
-                // Share the PDF
                 if (file && file.filePath) {
-                    const shareOptions = {
-                        title: 'Share Expense Report',
-                        message: `${monthNames[Month - 1]} ${Year} Expense Report`,
-                        url: `file://${file.filePath}`,
-                        type: 'application/pdf',
-                    };
+                    const fileName = `Expense_Report_${monthNames[Month - 1]}_${Year}.pdf`;
 
-                    await Share.open(shareOptions);
-                    Alert.alert('Success', 'Expense report generated successfully');
+                    try {
+                        // Try to save directly to Downloads folder
+                        const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+                        await RNFS.copyFile(file.filePath, downloadPath);
+                        console.log('PDF saved to:', downloadPath);
+                        Alert.alert('Success', `Expense report saved to Downloads as ${fileName}`);
+                    } catch (copyError) {
+                        console.warn('Direct save failed, using share:', copyError);
+
+                        // Fallback: Use Share to save the PDF
+                        const shareOptions = {
+                            title: 'Save Expense Report',
+                            url: `file://${file.filePath}`,
+                            type: 'application/pdf',
+                            filename: fileName,
+                        };
+
+                        await Share.open(shareOptions);
+                        Alert.alert('Success', 'PDF generated. Choose "Save to Downloads" or your preferred location.');
+                    }
                 } else {
                     throw new Error('PDF file path is undefined');
                 }
@@ -280,152 +421,130 @@ const TransactionReports = () => {
         }
     };
 
-    const renderHeader = () => {
-        return (
-            <ThemedView style={styles.headerContainer}>
-                {!showFilters ? (
-                    <LinearGradient colors={gradientColors} style={styles.headerGradient}>
-                        <View style={styles.topRow}>
-                            <ThemedTextInput style={styles.searchBar} placeholder="Search by category, product, or description" placeholderTextColor={theme === 'dark' ? '#AAAAAA' : '#666666'} value={searchText} onChangeText={handleSearch} />
-                            <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.iconButton}>
-                                <Icon name="filter-list" size={24} color="#FFFFFF" />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={handleDownload} style={styles.iconButton}>
-                                <Icon name="file-download" size={24} color="#FFFFFF" />
-                            </TouchableOpacity>
+    const renderHeader = () => (
+        <ThemedView style={styles.headerContainer}>
+            {!showFilters ? (
+                <LinearGradient colors={palette.headerGradient} style={styles.headerGradient}>
+                    <View style={styles.headerTopRow}>
+                        <View>
+                            <ThemedText style={styles.headerTitle}>Expense Reports</ThemedText>
+                            <ThemedText style={styles.headerSubtitle}>{monthNames[Month - 1]} {Year}</ThemedText>
                         </View>
-
-                        <View style={styles.currentPeriod}>
-                            <Icon name="event" size={18} color="#FFFFFF" />
-                            <ThemedText style={styles.periodText}>{monthNames[Month - 1]} {Year}
-                            </ThemedText>
-                        </View>
-                    </LinearGradient>
-                ) : (
-                    <ThemedView style={styles.filterContainer}>
-                        <View style={styles.filterHeader}>
-                            <ThemedText style={styles.filterTitle}>Select Period</ThemedText>
-                            <TouchableOpacity onPress={() => setShowFilters(false)} style={styles.closeButton}>
-                                <Icon name="close" size={24} color={iconColor} />
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.headerIconButton}>
+                                <Icon name="tune" size={20} color="#FFFFFF" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleDownload} style={styles.headerIconButton}>
+                                <Icon name="file-download" size={20} color="#FFFFFF" />
                             </TouchableOpacity>
                         </View>
+                    </View>
+                    <View style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", marginBottom: 20 }}>
+                        <View>
+                            <ThemedText style={[styles.summaryLabel, { color: palette.summaryText }]}>Total Expenses</ThemedText>
+                            <ThemedText style={[styles.summaryValue, { color: palette.summaryText }]}>₹{filteredData.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0).toLocaleString('en-IN')}</ThemedText>
+                        </View>
 
-                        <ThemedView style={styles.dropdownsContainer}>
-                            <ThemedView style={styles.dropdownBox}>
-                                <ThemedText style={styles.dropdownLabel}>Month</ThemedText>
-                                <DropDownPicker open={openMonth} value={Month} items={months} setValue={setMonth} setItems={setMonths} placeholder="Select Month"
-                                    style={styles.picker}
-                                    dropDownContainerStyle={styles.dropdownList} textStyle={styles.dropdownText} listMode="SCROLLVIEW"
-                                    setOpen={(isOpen) => {
-                                        setOpenMonth(isOpen);
-                                        if (isOpen) setOpenYear(false);
-                                    }}
-                                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
-                                />
-                            </ThemedView>
+                        <View>
+                            <ThemedText style={[styles.summaryLabel, { color: palette.summaryText }]}>Entries</ThemedText>
+                            <ThemedText style={[styles.summaryValue, { color: palette.summaryText }]}>{filteredData.length}</ThemedText>
+                        </View>
+                    </View>
 
-                            <ThemedView style={styles.dropdownBox}>
-                                <ThemedText style={styles.dropdownLabel}>Year</ThemedText>
-                                <DropDownPicker open={openYear} value={Year} items={years} setValue={setYear} setItems={setYears} placeholder="Select Year"
-                                    style={styles.picker}
-                                    dropDownContainerStyle={styles.dropdownList} textStyle={styles.dropdownText} listMode="SCROLLVIEW"
-                                    setOpen={(isOpen) => {
-                                        setOpenYear(isOpen);
-                                        if (isOpen) setOpenMonth(false);
-                                    }}
-                                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
-                                />
-                            </ThemedView>
-                        </ThemedView>
 
-                    </ThemedView>
-                )}
-            </ThemedView>
-        );
-    }
+                    <View style={[styles.searchContainer, { backgroundColor: palette.searchBackground, borderColor: palette.searchBorder }]}>
+                        <Icon name="search" size={18} color={palette.searchPlaceholder} style={styles.searchIcon} />
+                        <ThemedTextInput
+                            style={[styles.searchInput, { color: palette.textPrimary }]}
+                            placeholder="Search by category, product, or description"
+                            placeholderTextColor={palette.searchPlaceholder}
+                            value={searchText}
+                            onChangeText={handleSearch}
+                        />
+                    </View>
+                </LinearGradient>
+            ) : (
+                <ThemedView style={[styles.filterContainer, { backgroundColor: palette.searchBackground, borderColor: palette.cardBorder }]}>
+                    <View style={styles.filterHeader}>
+                        <ThemedText style={[styles.filterTitle, { color: palette.textPrimary }]}>Select Period</ThemedText>
+                        <TouchableOpacity onPress={() => setShowFilters(false)} style={styles.closeButton}>
+                            <Icon name="close" size={20} color={palette.textPrimary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.dropdownsContainer}>
+                        <View style={[styles.dropdownBox, styles.dropdownBoxSpacing]}>
+                            <ThemedText style={[styles.dropdownLabel, { color: palette.textSecondary }]}>Month</ThemedText>
+                            <DropDownPicker
+                                open={openMonth}
+                                value={Month}
+                                items={months}
+                                setValue={setMonth}
+                                setItems={setMonths}
+                                placeholder="Select Month"
+                                style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
+                                dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
+                                textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
+                                listMode="SCROLLVIEW"
+                                setOpen={(isOpen) => {
+                                    setOpenMonth(isOpen);
+                                    if (isOpen) setOpenYear(false);
+                                }}
+                                theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+                            />
+                        </View>
+
+                        <View style={styles.dropdownBox}>
+                            <ThemedText style={[styles.dropdownLabel, { color: palette.textSecondary }]}>Year</ThemedText>
+                            <DropDownPicker
+                                open={openYear}
+                                value={Year}
+                                items={years}
+                                setValue={setYear}
+                                setItems={setYears}
+                                placeholder="Select Year"
+                                style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
+                                dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
+                                textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
+                                listMode="SCROLLVIEW"
+                                setOpen={(isOpen) => {
+                                    setOpenYear(isOpen);
+                                    if (isOpen) setOpenMonth(false);
+                                }}
+                                theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+                            />
+                        </View>
+                    </View>
+                </ThemedView>
+            )}
+        </ThemedView>
+    );
 
     return (
-        <ThemedView style={styles.container}>
-            <View style={styles.headerSection}>
-                {renderHeader()}
-            </View>
-
-            {loading ? (
-                <LoaderSpinner />
-            ) : (
-                <View style={styles.contentContainer}>
-                    <ThemedView style={styles.reportHeader}>
-                        <ThemedText style={styles.reportTitle}>
-                            {monthNames[Month - 1]} {Year} Expense Report
+        <ThemedView style={[styles.container, { backgroundColor: palette.background }]}>
+            <LoaderSpinner shouldLoad={loading} />
+            
+            <FlatList
+                ListHeaderComponent={renderHeader}
+                stickyHeaderIndices={[0]}
+                data={filteredData}
+                keyExtractor={(item, index) => index.toString()}
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
+                ListFooterComponent={<View style={styles.listFooterSpacing} />}
+                ListEmptyComponent={() => (
+                    <View style={styles.emptyState}>
+                        <Icon name="receipt-long" size={48} color={palette.emptyIcon} />
+                        <ThemedText style={[styles.emptyTitle, { color: palette.textPrimary }]}>No expenses found</ThemedText>
+                        <ThemedText style={[styles.emptySubtitle, { color: palette.textSecondary }]}>
+                            Adjust your filters or try a different period to see results.
                         </ThemedText>
-                        <ThemedText style={styles.reportSubtitle}>
-                            {filteredData.length} transactions found
-                        </ThemedText>
-                    </ThemedView>
-
-                    <FlatList
-                        data={filteredData}
-                        keyExtractor={(item, index) => index.toString()}
-                        contentContainerStyle={styles.listContainer}
-                        showsVerticalScrollIndicator={false}
-                        ListEmptyComponent={() => (
-                            <ThemedView style={styles.noDataContainer}>
-                                <Icon name="receipt-long" size={48} color={iconColor} style={styles.noDataIcon} />
-                                <ThemedText style={styles.noDataText}>No expenses found</ThemedText>
-                                <ThemedText style={styles.noDataSubtext}>
-                                    Try changing filters or adding new expenses
-                                </ThemedText>
-                            </ThemedView>
-                        )}
-                        renderItem={({ item }) => (
-                            <ThemedView style={[styles.card, { borderColor: cardBorderColor }]}>
-                                <View style={styles.cardHeader}>
-                                    <ThemedText style={styles.productName} numberOfLines={1}>
-                                        {item.product}
-                                    </ThemedText>
-                                    <ThemedText style={styles.costAmount}>
-                                        ₹{parseFloat(item.cost).toLocaleString()}
-                                    </ThemedText>
-                                </View>
-
-                                <View style={styles.cardDetails}>
-                                    <View style={styles.detailRow}>
-                                        <Icon name="category" size={16} color={iconColor} style={styles.detailIcon} />
-                                        <ThemedText style={styles.detailText} numberOfLines={1}>
-                                            {item.category}
-                                        </ThemedText>
-                                    </View>
-
-                                    {item.tax_amount > 0 && (
-                                        <View style={styles.detailRow}>
-                                            <Icon name="receipt" size={16} color={iconColor} style={styles.detailIcon} />
-                                            <ThemedText style={styles.detailText}>
-                                                Tax: ₹{parseFloat(item.tax_amount).toLocaleString()}
-                                            </ThemedText>
-                                        </View>
-                                    )}
-
-                                    <View style={styles.detailRow}>
-                                        <Icon name="event" size={16} color={iconColor} style={styles.detailIcon} />
-                                        <ThemedText style={styles.detailText}>
-                                            {item.p_date}
-                                        </ThemedText>
-                                    </View>
-
-                                    {item.description && (
-                                        <View style={styles.detailRow}>
-                                            <Icon name="description" size={16} color={iconColor} style={styles.detailIcon} />
-                                            <ThemedText style={styles.detailText} numberOfLines={2}>
-                                                {item.description}
-                                            </ThemedText>
-                                        </View>
-                                    )}
-                                </View>
-                            </ThemedView>
-                        )}
-                    />
-                </View>
-            )}
+                    </View>
+                )}
+                renderItem={({ item, index }) => (
+                    <TransactionCard item={item} index={index} palette={palette} />
+                )}
+            />
         </ThemedView>
     );
 };
@@ -435,57 +554,105 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     headerSection: {
-        // paddingTop: 5,
-        zIndex: 1,
-        height: 100,
-        marginBottom: 5,
+        paddingHorizontal: 2,
+        paddingTop: 12,
+        paddingBottom: 16,
+
     },
     headerContainer: {
         width: '100%',
+        paddingHorizontal: 2,
+        paddingTop: 2,
+        marginBottom:20
     },
     headerGradient: {
-        padding: 10,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
+        borderRadius: 22,
+        padding: 24,
     },
-    topRow: {
+    headerTopRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 20,
     },
-    searchBar: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        borderRadius: 8,
-        padding: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '700',
         color: '#FFFFFF',
     },
-    iconButton: {
-        marginLeft: 12,
-        padding: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 8,
-    },
-    currentPeriod: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 12,
-    },
-    periodText: {
-        color: '#FFFFFF',
-        marginLeft: 8,
+    headerSubtitle: {
         fontSize: 14,
         fontWeight: '500',
+        color: 'rgba(255, 255, 255, 0.75)',
+        marginTop: 4,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerIconButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        marginLeft: 12,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 18,
+        gap: 12,
+    },
+    summaryCard: {
+        flex: 1,
+        borderRadius: 18,
+        padding: 18,
+    },
+    summaryCardContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    summaryLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    summaryValue: {
+        fontSize: 24,
+        fontWeight: '700',
+    },
+    summaryActionButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        height: 46,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        height: 46,
+        backgroundColor: 'transparent',
     },
     filterContainer: {
-        padding: 16,
-        borderRadius: 8,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        borderWidth: 1,
+        borderRadius: 18,
+        padding: 20,
     },
     filterHeader: {
         flexDirection: 'row',
@@ -495,138 +662,212 @@ const styles = StyleSheet.create({
     },
     filterTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '700',
     },
     closeButton: {
-        padding: 4,
-    },
-    dropdownLabel: {
-        marginBottom: 8,
-        fontSize: 14,
-    },
-    dropdownText: {
-        fontSize: 16,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     dropdownsContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        gap: 12,
+        marginTop: 8,
     },
     dropdownBox: {
         flex: 1,
-        zIndex: 1000,
+    },
+    dropdownBoxSpacing: {
+        marginRight: 12,
+    },
+    dropdownLabel: {
+        fontSize: 13,
+        marginBottom: 8,
+    },
+    dropdownText: {
+        fontSize: 15,
     },
     picker: {
-        borderColor: '#ccc',
-        borderRadius: 8,
-        height: 45,
-        backgroundColor: "transparent"
+        borderWidth: 1,
+        borderRadius: 12,
+        height: 48,
     },
     dropdownList: {
-       borderColor: '#ccc',
-        maxHeight: 800,
+        borderWidth: 1,
+        borderRadius: 12,
+        maxHeight: 600,
     },
-    applyButton: {
-        borderRadius: 8,
-        overflow: 'hidden',
-        marginTop: 8,
+    summaryGrid: {
+        paddingHorizontal: 16,
+        marginTop: 24,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
     },
-    applyGradient: {
-        padding: 12,
-        alignItems: 'center',
-    },
-    applyText: {
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    contentContainer: {
-        flex: 1,
-        padding: 10,
-        paddingTop: 50,
-    },
-    reportHeader: {
+    summaryCardWrapper: {
+        width: '48%',
         marginBottom: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0, 0, 0, 0.1)',
     },
-    reportTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 4,
+    summaryCard: {
+        borderRadius: 20,
+        padding: 18,
     },
-    reportSubtitle: {
-        fontSize: 14,
-        opacity: 0.7,
-        // paddingTop:500
+    summaryCardContent: {
+        flexDirection: 'column',
     },
-    listContainer: {
+    summaryIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        marginBottom: 14,
+    },
+    summaryTextGroup: {
+    },
+    summaryLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+
+    },
+    summaryValue: {
+        fontSize: 22,
+        fontWeight: '700',
+        marginTop: 4,
+    },
+    summaryDescription: {
+        fontSize: 11,
+        marginTop: 6,
+        opacity: 0.85,
+    },
+    listHeader: {
         paddingBottom: 16,
     },
-    card: {
-        borderRadius: 12,
-        marginBottom: 12,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+    reportHeader: {
+        marginHorizontal: 16,
+        marginBottom: 20,
         borderWidth: 1,
-        overflow: 'hidden',
+        borderRadius: 20,
+        padding: 16,
     },
-    cardHeader: {
+    reportHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0, 0, 0, 0.05)',
     },
-    productName: {
+    reportTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    reportSubtitle: {
+        fontSize: 13,
+        marginTop: 4,
+    },
+    reportHeaderIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    listContainer: {
+        paddingBottom: 32,
+        paddingHorizontal: 10,
+    },
+    listFooterSpacing: {
+        height: 24,
+    },
+    emptyState: {
+        paddingVertical: 80,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginTop: 16,
+    },
+    emptySubtitle: {
+        fontSize: 13,
+        marginTop: 6,
+        textAlign: 'center',
+    },
+    transactionCardWrapper: {
+        paddingHorizontal: 6,
+        marginBottom: 16,
+    },
+    transactionCard: {
+        borderRadius: 22,
+        padding: 18,
+        borderWidth: 1,
+    },
+    transactionHeader: {
+    },
+    categoryDateRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    productCostRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    transactionTitleRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        gap: 12,
+    },
+    transactionChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    transactionChipText: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 6,
+        maxWidth: 150,
+    },
+    transactionAmount: {
+        fontSize: 20,
+        fontWeight: '700',
+        maxWidth: 120,
+        flexShrink: 1,
+    },
+    transactionProduct: {
+        marginTop: 12,
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '600',
         flex: 1,
         marginRight: 8,
     },
-    costAmount: {
-        fontSize: 16,
-        fontWeight: 'bold',
+    transactionBody: {
+        marginTop: 16,
+        borderTopWidth: 1,
+        paddingTop: 12,
     },
-    cardDetails: {
-        padding: 12,
-    },
-    detailRow: {
+    transactionDetailRow: {
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 8,
     },
-    detailIcon: {
+    transactionDetailIcon: {
         marginRight: 8,
     },
-    detailText: {
-        fontSize: 14,
+    transactionDate: {
+        fontSize: 13,
+        color: 'inherit',
+    },
+    transactionDetailText: {
+        fontSize: 13,
         flex: 1,
-    },
-    noDataContainer: {
-        padding: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    noDataIcon: {
-        marginBottom: 16,
-        opacity: 0.6,
-    },
-    noDataText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    noDataSubtext: {
-        fontSize: 14,
-        textAlign: 'center',
-        opacity: 0.7,
     },
 });
 

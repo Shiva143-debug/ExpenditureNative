@@ -1,31 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Animated, Text, Alert } from 'react-native';
+import { useRoute, useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from "@react-navigation/native";
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LoaderSpinner from '../LoaderSpinner';
 import ThemedView from '../components/ThemedView';
 import ThemedText from '../components/ThemedText';
+import ThemedTextInput from '../components/ThemedTextInput';
 import LinearGradient from 'react-native-linear-gradient';
-import {getIncomeSources} from "../services/apiService"
+import {getIncomeSources, deleteSource} from "../services/apiService";
+import { ThemeContext } from '../context/ThemeContext';
+
+const colorProfiles = {
+  light: {
+    background: ['#dcfce7', '#bbf7d0'],
+    accent: '#15803d',
+    accentSoft: '#4a7c59',
+    cardShadow: '#00000022',
+    iconBackground: alpha => `rgba(21, 128, 61, ${alpha})`,
+    listBackground: '#f1fff6',
+    emptyIcon: '#9ca3af',
+    cardAccent: '#0f172a',
+  },
+  dark: {
+    background: ['#0f3a2d', '#0b1f16'],
+    accent: '#34d399',
+    accentSoft: '#5eead4',
+    cardShadow: '#00000044',
+    iconBackground: alpha => `rgba(52, 211, 153, ${alpha})`,
+    listBackground: '#0b1913',
+    emptyIcon: '#4b5563',
+    cardAccent: '#e2e8f0',
+  },
+};
+
+const buildGradientPair = (colors) => [colors[0], colors[1]];
+
+const AnimatedIncomeCard = ({ item, index, accentPalette, onDelete, onEdit }) => {
+  const translateY = useRef(new Animated.Value(30)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const deleteScaleAnim = useRef(new Animated.Value(1)).current;
+  const editScaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [index]);
+
+  const handleDeletePress = () => {
+    Animated.sequence([
+      Animated.timing(deleteScaleAnim, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(deleteScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onDelete?.(item));
+  };
+
+  const handleEditPress = () => {
+    Animated.sequence([
+      Animated.timing(editScaleAnim, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(editScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onEdit?.(item));
+  };
+
+  const getSourceConfig = (source) => {
+    return { gradient: ['#456e62ff', '#0b1f16'], icon: 'attach-money', textColor: 'white' };
+  };
+
+  const config = getSourceConfig(item.source);
+  const palette = accentPalette;
+
+  return (
+    <Animated.View style={[{ transform: [{ translateY }], opacity: opacityAnim }]}>
+      <View style={[styles.cardWrapper, { shadowColor: palette.cardShadow }] }>
+        <LinearGradient colors={config.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientCard}>
+          <TouchableOpacity activeOpacity={0.82} onPress={() => onEdit?.(item)} style={styles.gradientTouchable}>
+            <View style={styles.cardContent}>
+              <View style={styles.leftSection}>
+                <View style={[styles.iconBadge, { backgroundColor: palette.iconBackground(0.18) }]}>
+                  <Icon name={config.icon} size={32} color={config.textColor} />
+                </View>
+                <View style={styles.sourceDetails}>
+                  <ThemedText style={[styles.sourceLabel, { color: config.textColor }]}>{item.source}</ThemedText>
+                  <View style={styles.dateRow}>
+                    <Icon name="event" size={13} color="white" />
+                    <Text style={[styles.dateValue, { color: 'white'}]}> {item.date}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.rightSection}>
+                <ThemedText style={[styles.amountValue, { color: config.textColor }]}>₹{parseFloat(item.amount).toLocaleString('en-IN')}</ThemedText>
+                <View style={styles.actionButtons}>
+                <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
+                  <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
+                    <Icon name="edit" size={18} color={config.textColor} />
+                  </Animated.View>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
+                  <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
+                    <Icon name="delete" size={18} color="#dc2626" />
+                  </Animated.View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </LinearGradient>
+    </View>
+  </Animated.View>
+  );
+};
 
 const IncomeList = () => {
   const route = useRoute();
   const { id, Month, Year } = route.params;
   const [incomeData, setIncomeData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [filteredIncomeData, setFilteredIncomeData] = useState([]);
   const navigation = useNavigation();
+  const { theme } = useContext(ThemeContext);
+
+  const accentPalette = theme === 'dark' ? colorProfiles.dark : colorProfiles.light;
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
 
-  // Function to fetch income data
   const getMonthlyIncome = async () => {
     try {
       setLoading(true);
-      const data = await getIncomeSources(id,Month,Year);
+      const data = await getIncomeSources(id, Month, Year);
       if (Array.isArray(data)) {
         setIncomeData(data);
       } else {
@@ -39,59 +171,122 @@ const IncomeList = () => {
     }
   };
 
-  // Load income data when component mounts or when Month/Year changes
-  useEffect(() => {
-    if (id && Month && Year) {
-      getMonthlyIncome();
-    }
-  }, [Month, Year, id]);
-
-  const totalAmount = incomeData.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
-
-  const renderHeader = () => (
-    <ThemedView style={styles.headerContainer}>
-      <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.headerGradient}>
-        <View style={styles.headerContent}>
-          <View>
-            <ThemedText style={styles.headerTitle}>Income List</ThemedText>
-            <ThemedText style={styles.headerSubtitle}>{monthNames[parseInt(Month) - 1]} {Year}</ThemedText>
-          </View>
-          <View style={styles.headerAmount}>
-            <ThemedText style={styles.totalLabel}>Total Income</ThemedText>
-            <ThemedText style={styles.totalAmount}> ₹{totalAmount.toLocaleString()}</ThemedText>
-          </View>
-        </View>
-      </LinearGradient>
-    </ThemedView>
+  useFocusEffect(
+    React.useCallback(() => {
+      if (id && Month && Year) {
+        getMonthlyIncome();
+      }
+    }, [Month, Year, id])
   );
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity style={styles.card}>
-      <ThemedView style={styles.cardInner}>
-        <View style={styles.sourceInfo}>
-          <View style={styles.iconContainer}>
-            <Icon name="account-balance-wallet" size={24} color="#4CAF50" />
-          </View>
-          <View style={styles.textContainer}>
-            <ThemedText style={styles.sourceText}>{item.source}</ThemedText>
-            <ThemedText style={styles.dateText}><Icon name="event" size={14} /> {item.date} </ThemedText>
-          </View>
+  // Filter income data based on search text
+  React.useEffect(() => {
+    if (searchText.trim() === '') {
+      setFilteredIncomeData(incomeData);
+    } else {
+      const lowerSearch = searchText.toLowerCase();
+      setFilteredIncomeData(incomeData.filter(item =>
+        (item.source || '').toLowerCase().includes(lowerSearch) ||
+        (item.amount || '').toString().includes(lowerSearch)
+      ));
+    }
+  }, [incomeData, searchText]);
+
+  const totalAmount = filteredIncomeData.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
+  const isDark = theme === 'dark';
+
+  const renderHeader = () => (
+    <LinearGradient colors={accentPalette.background} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+      <View style={styles.headerTopRow}>
+        <View>
+          <ThemedText style={[styles.headerTitle, { color: accentPalette.accent }]}>Income Sources</ThemedText>
+          <ThemedText style={[styles.headerSubtitle, { color: accentPalette.accentSoft }]}>{monthNames[parseInt(Month) - 1]} {Year}</ThemedText>
         </View>
-        <View style={styles.amountContainer}>
-          <ThemedText style={styles.amountText}> ₹{parseFloat(item.amount).toLocaleString()} </ThemedText>
+        <Icon name="trending-up" size={40} color={accentPalette.accent} />
+      </View>
+      <View style={[styles.totalCard, { backgroundColor: accentPalette.iconBackground(0.18) }]}>
+        <View>
+          <ThemedText style={[styles.totalLabel, { color: accentPalette.accentSoft }]}>Total Income</ThemedText>
+          <ThemedText style={[styles.totalAmount, { color: accentPalette.accent }]}>₹{totalAmount.toLocaleString('en-IN')}</ThemedText>
         </View>
-      </ThemedView>
-    </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
+
+  const handleDeleteIncome = (item) => {
+    Alert.alert(
+      "Delete Income Source",
+      "Are you sure you want to delete this income source?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await deleteSource(item.id, id);
+              // Refresh the income data after deletion
+              await getMonthlyIncome();
+              Alert.alert("Success", "Income source deleted successfully");
+            } catch (error) {
+              console.error("Error deleting income source:", error);
+              Alert.alert("Error", "Failed to delete income source");
+            } finally {
+              setLoading(false);
+            }
+          },
+          style: "destructive"
+        }
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleEditIncome = (item) => {
+    console.log('Edit income:', item);
+  };
+
+  const renderItem = ({ item, index }) => (
+    <AnimatedIncomeCard 
+      item={item} 
+      index={index} 
+      accentPalette={accentPalette}
+      onDelete={handleDeleteIncome}
+      onEdit={handleEditIncome}
+    />
   );
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: accentPalette.listBackground }]}>
       <LoaderSpinner shouldLoad={loading} />
       <View style={styles.headerSection}>
         {renderHeader()}
       </View>
-      <FlatList data={incomeData}keyExtractor={(item, index) => item.source + index}
-        renderItem={renderItem} contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false}/>
+      <View style={styles.searchSection}>
+        <ThemedTextInput
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search sources or amounts..."
+          style={styles.searchInput}
+        />
+      </View>
+      <FlatList
+        data={filteredIncomeData}
+        keyExtractor={(item, index) => item.source + index}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={true}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Icon name="trending-up" size={48} color={isDark ? '#666' : '#ccc'} />
+            <ThemedText style={styles.emptyText}>No income sources found</ThemedText>
+          </View>
+        }
+      />
     </ThemedView>
   );
 };
@@ -101,113 +296,156 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    // paddingTop: 5,
     zIndex: 1,
-    height: 100,
-    marginBottom: 5,
+    paddingHorizontal: 6,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
-  headerContainer: {
-    width: '100%',
-    height: '100%',
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
   headerGradient: {
-    borderRadius: 15,
-    margin: 15,
-    padding: 20,
-    elevation: 5,
+    borderRadius: 20,
+    padding: 24,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    height: '100%',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
-  headerContent: {
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#fff',
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#fff',
-    opacity: 0.9,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '500',
   },
-  headerAmount: {
-    alignItems: 'flex-end',
-    paddingRight: 5,
+  totalCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 14,
+    padding: 16,
+    backdropFilter: 'blur(10px)',
   },
   totalLabel: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.9,
-    marginBottom: 4,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+    marginBottom: 6,
   },
   totalAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#fff',
   },
   listContainer: {
-    padding: 15,
-    paddingTop: 5,
+    padding: 6,
+    paddingTop: 8,
   },
-  card: {
-    marginTop: 10,
-    marginBottom: 10,
-    borderRadius: 12,
+  cardWrapper: {
+    marginBottom: 14,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  
-  cardInner: {
+  gradientCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  cardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
-    padding: 15,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'rgba(221, 215, 215, 0.1)',
-    marginBottom: 10,
-    borderColor: 'whitesmoke',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
   },
-  sourceInfo: {
+  gradientTouchable: {
+    flex: 1,
+    borderRadius: 16,
+  },
+  leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  iconBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
-  textContainer: {
+  sourceDetails: {
     flex: 1,
   },
-  sourceText: {
+  sourceLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    color: '#fff',
+    marginBottom: 6,
   },
-  dateText: {
-    fontSize: 14,
-    opacity: 0.6,
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  amountContainer: {
-    paddingLeft: 15,
+  dateValue: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontWeight: '500',
   },
-  amountText: {
+  rightSection: {
+    marginLeft: 12,
+    alignItems: 'flex-end',
+  },
+  amountValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    padding: 6,
+  },
+  deleteButton: {
+    padding: 6,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontWeight: '500',
+    marginTop: 12,
+    opacity: 0.6,
   },
 });
 

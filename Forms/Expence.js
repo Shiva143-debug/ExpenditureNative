@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Modal, Alert } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -14,8 +14,9 @@ import Toast from "react-native-toast-message";
 import LinearGradient from 'react-native-linear-gradient';
 import LoaderSpinner from '../LoaderSpinner';
 import { getCategories as fetchCategories, getProducts as fetchProducts, addCategory, addProduct, addExpense } from '../services/apiService';
+import { useFocusEffect } from "@react-navigation/native";
 
-const Expense = () => {
+const Expense = ({ palette }) => {
     const { id } = useAuth();
     const [visible, setVisible] = useState(false);
     const [productVisible, setProductVisible] = useState(false);
@@ -51,6 +52,25 @@ const Expense = () => {
     // Replace taxDropOpen and isTaxApplicableValue with a single switch state
     const [isTaxApplicable, setIsTaxApplicable] = useState(false);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            // Reset all form fields and dropdowns when screen comes into focus
+            setCategoryOpen(false);
+            setProductOpen(false);
+            setCategoryValue("");
+            setProductValue("");
+            setCost("");
+            setPurchaseDate("");
+            setDescription("");
+            setTaxPercentage("");
+            setTaxAmount("");
+            setSelectedImage(null);
+            setIsTaxApplicable(false);
+            return () => { };
+        }, [])
+    );
+
+
     // Modal visibility handlers
     const hideAddCategoryDialog = () => {
         setVisible(false);
@@ -65,7 +85,7 @@ const Expense = () => {
     // Submit handlers for new category and product
     const handleCategorySubmit = async () => {
         if (!newCategory.trim()) {
-            Toast.show({  type: "error", text1: "Error", text2: "Please enter a category name", position: "top", visibilityTime: 3000 });
+            Toast.show({ type: "error", text1: "Error", text2: "Please enter a category name", position: "top", visibilityTime: 3000 });
             return;
         }
 
@@ -73,8 +93,9 @@ const Expense = () => {
             setIsAddingCategory(true);
             // Use the imported addCategory function from apiService
             await addCategory(id, newCategory);
-            
-            Toast.show({ type: "success", text1: "Success", text2: "Category added successfully", position: "top", visibilityTime: 3000 
+
+            Toast.show({
+                type: "success", text1: "Success", text2: "Category added successfully", position: "top", visibilityTime: 3000
             });
             setRefreshFlag(prev => !prev);
             hideAddCategoryDialog();
@@ -93,7 +114,7 @@ const Expense = () => {
         }
 
         if (!categoryValue) {
-            Toast.show({  type: "error", text1: "Error", text2: "Please select a category", position: "top", visibilityTime: 3000 });
+            Toast.show({ type: "error", text1: "Error", text2: "Please select a category", position: "top", visibilityTime: 3000 });
             return;
         }
 
@@ -101,7 +122,7 @@ const Expense = () => {
             setIsAddingProduct(true);
             // Use the imported addProduct function from apiService
             await addProduct(id, categoryValue, newProduct);
-            
+
             Toast.show({ type: "success", text1: "Success", text2: "Product added successfully", position: "top", visibilityTime: 3000 });
             setRefreshFlag(prev => !prev);
             hideAddProductDialog();
@@ -136,7 +157,7 @@ const Expense = () => {
         try {
             // Use the imported fetchCategories function from apiService
             const data = await fetchCategories(id);
-            
+
             if (data) {
                 const transformedData = data.map(item => ({
                     label: item.category,
@@ -160,7 +181,7 @@ const Expense = () => {
             try {
                 // Use the imported fetchProducts function from apiService
                 const data = await fetchProducts(id, categoryValue);
-                
+
                 if (data) {
                     const transformedData = data.map(item => ({
                         label: item.product,
@@ -268,8 +289,9 @@ const Expense = () => {
 
             // Use the imported addExpense function from apiService
             await addExpense(expenseData);
-            
-            Toast.show({ type: "success", text1: "Success", text2: "Expense added successfully", position: "top", visibilityTime: 3000, autoHide: true 
+
+            Toast.show({
+                type: "success", text1: "Success", text2: "Expense added successfully", position: "top", visibilityTime: 3000, autoHide: true
             });
             handleClear();
         } catch (error) {
@@ -289,7 +311,7 @@ const Expense = () => {
                         <View style={styles.rowContainer}>
                             <View style={styles.flexItem}>
                                 <View style={styles.labelRow}>
-                                    <ThemedText style={styles.label}>Category</ThemedText>
+                                    <ThemedText style={styles.label}>Category :</ThemedText>
                                     <TouchableOpacity onPress={() => setVisible(true)}>
                                         <Icon name="add-circle" size={24} color="#4CAF50" />
                                     </TouchableOpacity>
@@ -307,7 +329,7 @@ const Expense = () => {
 
                             <View style={styles.flexItem}>
                                 <View style={styles.labelRow}>
-                                    <ThemedText style={styles.label}>Expence</ThemedText>
+                                    <ThemedText style={styles.label}>Sub Category :</ThemedText>
                                     {categoryValue && (
                                         <TouchableOpacity onPress={() => setProductVisible(true)}>
                                             <Icon name="add-circle" size={24} color="#4CAF50" />
@@ -330,24 +352,41 @@ const Expense = () => {
                         </View>
 
                         <View style={styles.inputSection}>
-                            <ThemedText style={styles.label}>Cost</ThemedText>
-                            <ThemedTextInput placeholder="Enter Cost" value={cost} onChangeText={setCost} keyboardType="numeric" style={styles.input} />
+                            <ThemedText style={styles.label}>Amount (₹):</ThemedText>
+                            <ThemedTextInput placeholder="Enter Amount" value={cost} onChangeText={setCost} keyboardType="numeric" style={styles.input} />
                         </View>
 
                         <View style={styles.inputSection}>
-                            <ThemedText style={styles.label}>Purchase Date</ThemedText>
-                            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
+                            <ThemedText style={styles.label}>Date :</ThemedText>
+                            
+                            <TouchableOpacity onPress={() => setShowDatePicker(true)}
+                                style={[styles.dateButton, { borderColor: palette.savingBorder }]}
+                            >
+                                <ThemedText style={[styles.dateButtonText, { color: purchaseDate ? palette.savingText : palette.tabInactiveText }]}>
+                                    {purchaseDate || 'Select Date'}
+                                </ThemedText>
+                            </TouchableOpacity>
+                            {showDatePicker && (
+                                <DateTimePicker
+                                    value={purchaseDate ? new Date(purchaseDate) : new Date()}
+                                    mode="date"
+                                    display="default"
+                                    onChange={handleDateChange}
+                                />
+                            )}
+                        </View>
+
+
+{/* <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
                                 <ThemedText style={styles.dateButtonText}>
                                     {purchaseDate || 'Select Date'}
                                 </ThemedText>
                             </TouchableOpacity>
                             {showDatePicker && (
                                 <DateTimePicker value={purchaseDate ? new Date(purchaseDate) : new Date()} mode="date" display="default" onChange={handleDateChange} />
-                            )}
-                        </View>
-
+                            )} */}
                         <View style={styles.inputSection}>
-                            <ThemedText style={styles.label}>Description</ThemedText>
+                            <ThemedText style={styles.label}>Description :</ThemedText>
                             <ThemedTextAreaInput placeholder="Enter Description" value={description} onChangeText={setDescription} style={styles.textArea} />
                         </View>
 
@@ -367,13 +406,13 @@ const Expense = () => {
 
                         <View style={styles.taxSection}>
                             <View style={styles.switchContainer}>
-                                <ThemedText style={styles.label}>Tax Applicable</ThemedText>
+                                <ThemedText style={styles.label}>Tax Applicable :</ThemedText>
                                 <Switch value={isTaxApplicable} onValueChange={handleTaxToggle} trackColor={{ false: '#767577', true: '#81b0ff' }} thumbColor={isTaxApplicable ? '#1976D2' : '#f4f3f4'} />
                             </View>
 
                             {isTaxApplicable && (
                                 <View style={styles.taxDetails}>
-                                    <ThemedTextInput placeholder="Tax Percentage" value={taxPercentage} onChangeText={handleTaxPercentageChange} keyboardType="numeric" style={styles.input} />
+                                    <ThemedTextInput placeholder="Enter Tax Percentage" value={taxPercentage} onChangeText={handleTaxPercentageChange} keyboardType="numeric" style={styles.input} />
                                     <ThemedTextInput placeholder="Tax Amount" value={taxAmount} editable={false} style={[styles.input, styles.disabledInput]}
                                     />
                                 </View>
@@ -496,7 +535,7 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 16,
         fontWeight: '500',
-        marginBottom: 8,
+        marginBottom: 2,
     },
     inputSection: {
         marginBottom: 20,
@@ -510,7 +549,7 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 8,
         height: 45,
-        backgroundColor:"transparent"
+        backgroundColor: "transparent"
     },
     dropdownList: {
         borderColor: '#ccc',
@@ -518,7 +557,7 @@ const styles = StyleSheet.create({
     },
     dropdownText: {
         fontSize: 16,
-        color:"gray"
+        color: "gray"
     },
     textArea: {
         height: 100,
@@ -527,19 +566,20 @@ const styles = StyleSheet.create({
         marginBottom: 0,
     },
     dateButton: {
-        height: 45,
-        justifyContent: 'center',
-        borderRadius: 8,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
         borderWidth: 1,
-        borderColor: '#ccc',
-        paddingHorizontal: 15,
+        borderRadius: 50,
+        marginBottom: 2,
+        borderColor: "white"
     },
     dateButtonText: {
-        fontSize: 16,
-        color: '#333',
+        fontSize: 15,
+        fontWeight: '500',
+        textAlign: 'center',
     },
     imageButton: {
-        marginBottom: 8,
+        marginBottom: 16,
     },
     imageButtonGradient: {
         flexDirection: 'row',
@@ -655,7 +695,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         height: 45,
         marginBottom: 15,
-        backgroundColor:"transparent"
+        backgroundColor: "transparent"
     },
     modalDropdownList: {
         borderColor: '#ccc',

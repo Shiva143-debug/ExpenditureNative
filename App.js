@@ -27,6 +27,9 @@ import ExpenseByCategoryList from "./DashboardScreens/Expences/ExpenseByCategory
 import { ThemeProvider } from './context/ThemeContext';
 import TransactionReports from './Reports/transactionReports';
 import SavingsList from './DashboardScreens/SavingsList';
+import CategoriesScreen from './DashboardScreens/CategoriesScreen';
+import ProductsScreen from './DashboardScreens/ProductsScreen';
+import SourcesScreen from './DashboardScreens/SourcesScreen';
 
 
 const Tab = createBottomTabNavigator();
@@ -56,17 +59,16 @@ const DashboardStack = () => {
       <Stack.Screen name="SavingsList" component={SavingsList} options={{ headerShown: false }}/>
       <Stack.Screen name="TaxAmountList" component={TaxAmountList} options={{ headerShown: false }}/>
       <Stack.Screen name="ExpenseByCategoryList" component={ExpenseByCategoryList} options={{ headerShown: false }}/>
+      <Stack.Screen name="CategoriesScreen" component={CategoriesScreen} options={{ headerShown: false }}/>
+      <Stack.Screen name="ProductsScreen" component={ProductsScreen} options={{ headerShown: false }}/>
+      <Stack.Screen name="SourcesScreen" component={SourcesScreen} options={{ headerShown: false }}/>
     </Stack.Navigator>
   );
 };
 
 const MainTabs = () => (
-  <Tab.Navigator
-    tabBar={props => <Footer {...props} />}
-    screenOptions={{
-      headerShown: false,
-    }}
-  >
+  <Tab.Navigator tabBar={props => <Footer {...props} />}
+    screenOptions={{ headerShown: false,}}>
     <Tab.Screen name="dashboard" component={DashboardStack} options={{ title: "Dashboard" }} />
     <Tab.Screen name="Add" component={Add} options={{ title: "Add" }} />
     <Tab.Screen name="transactionReports" component={TransactionReports} options={{ title: "Reports" }} />
@@ -85,9 +87,7 @@ const AppNavigator = () => {
             <Stack.Screen name="Register" component={Register} options={{ headerShown: false }} />
           </>
         ) : (
-          <Stack.Screen 
-            name="MainTabs" 
-            component={MainTabs}
+          <Stack.Screen  name="MainTabs"  component={MainTabs}
             options={{
               header: ({ navigation }) => <Header navigation={navigation} />,
             }}

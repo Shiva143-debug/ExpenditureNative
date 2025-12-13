@@ -11,6 +11,7 @@ import ThemedTextInput from '../components/ThemedTextInput';
 import LinearGradient from 'react-native-linear-gradient';
 import { getDefaultSources, addSource, addDefaultSource } from '../services/apiService';
 import LoaderSpinner from "../LoaderSpinner";
+import { useFocusEffect } from "@react-navigation/native";
 
 const Source = () => {
   const { id } = useAuth();
@@ -40,6 +41,19 @@ const Source = () => {
     }
   };
 
+
+      useFocusEffect(
+          React.useCallback(() => {
+              // Reset all form fields and dropdowns when screen comes into focus
+              setSourceOpen(false);
+              setSourceValue(null);
+              setSourceName("");
+              setAmount("");
+              setDate('');
+              return () => { };
+          }, [])
+      );
+  
   useEffect(() => {
     if (!id) return;
 
@@ -142,7 +156,7 @@ const Source = () => {
         <ThemedView style={styles.container}>
           <ThemedView style={styles.formContainer}>
             <View style={styles.sourceHeader}>
-              <ThemedText style={styles.label}>Select Source:</ThemedText>
+              <ThemedText style={styles.label}>Select Source of Income:</ThemedText>
               <TouchableOpacity onPress={onDialogOpen}>
                 <Icon name="add-circle" size={24} color="#4CAF50" />
               </TouchableOpacity>
@@ -153,10 +167,11 @@ const Source = () => {
               style={styles.dropdown} listMode="SCROLLVIEW" dropDownContainerStyle={styles.dropdownList} textStyle={styles.dropdownText}
             />
 
-            <ThemedText style={styles.label}>Amount:</ThemedText>
+            <ThemedText style={styles.label}>Amount (₹) :</ThemedText>
             <ThemedTextInput placeholder="Enter Amount" value={amount}
               onChangeText={handleAmountChange} keyboardType="numeric" style={styles.input} />
-            <ThemedText style={styles.label}>Select Date:</ThemedText>
+
+            <ThemedText style={styles.label}>Date:</ThemedText>
             <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
               <ThemedText style={styles.dateButtonText}>
                 {date ? date : 'Select Date'}
@@ -245,6 +260,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 10,
     marginBottom: 10,
   },
   label: {
@@ -253,7 +269,7 @@ const styles = StyleSheet.create({
   },
   dropdown: {
     borderColor: '#ccc',
-    marginBottom: 15,
+    marginBottom: 50,
     borderRadius: 8,
     backgroundColor:"transparent"
   },
@@ -266,14 +282,14 @@ const styles = StyleSheet.create({
     color:"gray"
   },
   input: {
-    marginBottom: 15,
+    marginBottom: 40,
   },
   dateButton: {
     padding: 15,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ccc',
-    marginBottom: 20,
+    marginBottom: 40,
   },
   dateButtonText: {
     fontSize: 16,

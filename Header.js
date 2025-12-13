@@ -11,10 +11,11 @@ const Header = ({ navigation }) => {
   const { logout } = useAuth();
   const { theme } = useContext(ThemeContext);
 
-  const iconColor = theme === 'dark' ? '#FFFFFF' : '#1976D2';
+  const iconColor = theme === 'dark' ? '#1b1b1dff' : '#64B5F6';
+  const titleColor = theme === 'dark' ? '#3F51B5' : '#1E3A8A';
   const gradientColors = theme === 'dark'
-    ? ['#1A237E', '#283593']
-    : ['#1976D2', '#42A5F5'];
+    ? ['#0d0d0eff', '#37373bff']
+    : ['#E3F2FD', '#feffffff'];
 
   const confirmLogout = () => {
     Alert.alert(
@@ -40,12 +41,14 @@ const Header = ({ navigation }) => {
     <ThemedView style={styles.headerContainer}>
       <LinearGradient
         colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
-        <ThemedText style={styles.headerTitle}>Expenditure</ThemedText>
+        <ThemedText style={[styles.headerTitle, { color: titleColor }]}>Expenditure</ThemedText>
 
         <TouchableOpacity onPress={confirmLogout} style={styles.logoutButton}>
-          <Icon name="logout" size={24} color="#FFFFFF" />
+          <Icon name="logout" size={24} color={iconColor} />
         </TouchableOpacity>
       </LinearGradient>
     </ThemedView>
@@ -61,17 +64,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   logoutButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
 });
 
