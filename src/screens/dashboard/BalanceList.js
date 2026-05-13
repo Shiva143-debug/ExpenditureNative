@@ -124,11 +124,11 @@ const BalanceList = () => {
         for (let i = 1; i <= 12; i++) {
             const income = totalIncomeData
                 .filter(item => item.month == i && item.year == year)
-                .reduce((acc, curr) => acc + curr.amount, 0);
+                .reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
 
             const expenses = totalCostData
                 .filter(item => item.month == i && item.year == year)
-                .reduce((acc, curr) => acc + curr.cost, 0);
+                .reduce((acc, curr) => acc + parseFloat(curr.cost), 0);
 
             // const balance = income - expenses;
             const savings = totalSavingsData
@@ -168,8 +168,8 @@ const BalanceList = () => {
     });
 
     const renderHeader = () => {
-        const totalIncome = groupedArray.reduce((sum, item) => sum + item.income, 0);
-        const totalExpenses = groupedArray.reduce((sum, item) => sum + item.expenses, 0);
+        const totalIncome = groupedArray.reduce((sum, item) => sum + parseInt(item.income), 0);
+        const totalExpenses = groupedArray.reduce((sum, item) => sum + parseInt(item.expenses), 0);
         const totalSavings = totalSavingsData.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
         const totalBalance = totalIncome - (totalExpenses + totalSavings);
         const isPositiveBalance = totalBalance >= 0;
@@ -250,7 +250,7 @@ const BalanceList = () => {
                     <View style={styles.statsGrid}>
                         <View style={styles.statBox}>
                             <ThemedText style={styles.statLabel}>Income</ThemedText>
-                            <ThemedText style={[styles.statValue, { color: '#4CAF50' }]}>₹{item.income.toLocaleString()}</ThemedText>
+                            <ThemedText style={[styles.statValue, { color: '#4CAF50' }]}>₹ {Number(item.income).toLocaleString()}</ThemedText>
                         </View>
                         <View style={styles.statBox}>
                             <View style={styles.statDivider} />

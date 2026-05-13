@@ -595,7 +595,7 @@ const ItemReport = () => {
       ]).start(() => onEdit?.(item));
     };
 
-    const isTaxApplicable = (item.is_tax_app || '').toLowerCase() === 'yes';
+    const isTaxApplicable = item.is_tax_app 
     const cost = parseCurrencyValue(item.cost);
     const providedTax = parseCurrencyValue(item.tax_amount);
     const taxAmountRaw = isTaxApplicable
@@ -617,12 +617,12 @@ const ItemReport = () => {
         <View style={styles.actionButtons}>
           <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
             <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
-              <Icon name="edit" size={18} color={iconPrimary} />
+              <Icon name="edit-note" size={18} color={iconPrimary} />
             </Animated.View>
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
             <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
-              <Icon name="delete" size={18} color={iconPrimary} />
+              <Icon name="delete-outline" size={18} color={iconPrimary} />
             </Animated.View>
           </TouchableOpacity>
         </View>
@@ -643,7 +643,7 @@ const ItemReport = () => {
               <View style={styles.dateRow}>
                 <Icon name="event" size={16} color={iconPrimary} />
                 <ThemedText style={[styles.dateText, { color: textSecondary }]}>
-                  {item.p_date}
+                {new Date(item.p_date).toLocaleDateString('en-GB').replace(/\//g, '-')}
                 </ThemedText>
               </View>
             </View>

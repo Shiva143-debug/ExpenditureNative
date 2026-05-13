@@ -83,10 +83,10 @@ const AnimatedProductCard = ({ item, index, onPress, onEdit, onDelete, palette }
           </View>
           <View style={styles.rightSection}>
             <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
-              <Icon name="edit" size={20} color={palette.cardAccent} />
+              <Icon name="edit-note" size={20} color={palette.cardAccent} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionButton}>
-              <Icon name="delete" size={20} color="#ff4444" />
+              <Icon name="delete-outline" size={20} color="#ff4444" />
             </TouchableOpacity>
           </View>
         </View>
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(35, 35, 35, 0.3)',
     elevation: 6,
-    shadowColor: '#000',
+    shadowColor: '#1b1b20',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 30,

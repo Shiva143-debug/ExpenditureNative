@@ -108,7 +108,7 @@ const AnimatedSavingsCard = ({ item, index, onDelete, onEdit, palette }) => {
                                 </ThemedText>
                                 <View style={styles.dateRow}>
                                     <Icon name="event" size={13} color={`${palette.cardAccent}cc`} />
-                                    <Text style={[styles.dateValue, { color: `${palette.cardAccent}cc` }]}> {item.date}</Text>
+                                    <Text style={[styles.dateValue, { color: `${palette.cardAccent}cc` }]}>{new Date(item.date).toLocaleDateString('en-GB').replace(/\//g, '-')}</Text>
                                 </View>
                                 {item.note && <ThemedText style={[styles.savingLabel, { color: palette.cardAccent }]}>
                                     {item.note}
@@ -120,12 +120,12 @@ const AnimatedSavingsCard = ({ item, index, onDelete, onEdit, palette }) => {
                             <View style={styles.actionButtons}>
                                 <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
                                     <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
-                                        <Icon name="edit" size={18} color={palette.cardAccent} />
+                                        <Icon name="edit-note" size={18} color={palette.cardAccent} />
                                     </Animated.View>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
                                     <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
-                                        <Icon name="delete" size={18} color="#dc2626" />
+                                        <Icon name="delete-outline" size={18} color="#dc2626" />
                                     </Animated.View>
                                 </TouchableOpacity>
                             </View>
@@ -412,7 +412,7 @@ const SavingsList = () => {
                             style={styles.dateButton}
                         >
                             <Text style={styles.dateButtonText}>
-                                {date || 'Select Date'}
+                                {new Date(date).toLocaleDateString('en-GB').replace(/\//g, '-') || 'Select Date'}
                             </Text>
                         </TouchableOpacity>
 
@@ -575,11 +575,12 @@ const styles = StyleSheet.create({
     savingLabel: {
         fontSize: 12,
         fontWeight: '600',
-        marginBottom: 6,
+        marginTop: 6,
     },
     dateRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 4,
     },
     dateValue: {
         fontSize: 13,

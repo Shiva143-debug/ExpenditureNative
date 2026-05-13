@@ -72,10 +72,10 @@ const AnimatedCategoryCard = ({ item, index, onPress, onEdit, onDelete, palette 
           </View>
           <View style={styles.rightSection}>
             <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionButton}>
-              <Icon name="edit" size={20} color={palette.cardAccent} />
+              <Icon name="edit-note" size={20} color={palette.cardAccent} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionButton}>
-              <Icon name="delete" size={20} color="#ff4444" />
+              <Icon name="delete-outline" size={20} color="#ff4444" />
             </TouchableOpacity>
           </View>
         </View>

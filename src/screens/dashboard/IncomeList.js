@@ -122,7 +122,7 @@ const AnimatedIncomeCard = ({ item, index, accentPalette, onDelete, onEdit }) =>
                   <ThemedText style={[styles.sourceLabel, { color: config.textColor }]}>{item.source}</ThemedText>
                   <View style={styles.dateRow}>
                     <Icon name="event" size={13} color="white" />
-                    <Text style={[styles.dateValue, { color: 'white' }]}> {item.date}</Text>
+                    <Text style={[styles.dateValue, { color: 'white' }]}>{new Date(item.date).toLocaleDateString('en-GB').replace(/\//g, '-')}</Text>
                   </View>
                 </View>
               </View>
@@ -131,12 +131,12 @@ const AnimatedIncomeCard = ({ item, index, accentPalette, onDelete, onEdit }) =>
                 <View style={styles.actionButtons}>
                   <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
                     <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
-                      <Icon name="edit" size={18} color={config.textColor} />
+                      <Icon name="edit-note" size={18} color={config.textColor} />
                     </Animated.View>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
                     <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
-                      <Icon name="delete" size={18} color="#dc2626" />
+                      <Icon name="delete-outline" size={18} color="#dc2626" />
                     </Animated.View>
                   </TouchableOpacity>
                 </View>
@@ -376,7 +376,7 @@ const IncomeList = () => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="trending-up" size={48} color={isDark ? '#666' : '#ccc'} />
-            <ThemedText style={styles.emptyText}>No income sources found</ThemedText>
+            <ThemedText style={styles.emptyText}>No Income Sources Found</ThemedText>
           </View>
         }
       />
@@ -597,6 +597,7 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   dateValue: {
     fontSize: 13,

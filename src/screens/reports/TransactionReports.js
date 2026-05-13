@@ -55,7 +55,7 @@ const TransactionCard = ({ item, index, palette }) => {
                             </ThemedText>
                         </View>
                         <ThemedText style={[styles.transactionDate, { color: '#ffffff' }]}>
-                            {item.p_date || '—'}
+                            {new Date(item.p_date).toLocaleDateString('en-GB').replace(/\//g, '-')}
                         </ThemedText>
                     </View>
                     <View style={styles.productCostRow}>
@@ -290,8 +290,8 @@ const TransactionReports = () => {
             <td style="padding:8px;">${item.expense_name || 'N/A'}</td>
             <td style="padding:8px;">₹${Number(item.cost || 0).toLocaleString()}</td>
             <td style="padding:8px;">₹${Number(item.tax_amount || 0).toLocaleString()}</td>
-            <td style="padding:8px;">${item.p_date || 'N/A'}</td>
-            <td style="padding:8px;">${item.description || ''}</td>
+            <td style="padding:8px;">${new Date(item.p_date).toLocaleDateString('en-GB').replace(/\//g, '-')}</td>
+            <td style="padding:8px;">${item.description || '-------------------'}</td>
           </tr>
         `;
                 });
@@ -547,12 +547,13 @@ const styles = StyleSheet.create({
     headerContainer: {
         width: '100%',
         paddingHorizontal: 2,
-        paddingTop: 2,
+        // paddingTop: 2,
         marginBottom: 20
     },
     headerGradient: {
-        borderRadius: 22,
+        borderRadius: 14,
         padding: 24,
+       
     },
     headerTopRow: {
         flexDirection: 'row',
