@@ -1,67 +1,232 @@
-import React from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
-import ThemedText from '../../components/ThemedText';
-import LinearGradient from 'react-native-linear-gradient';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, FlatList, StyleSheet, Animated, Text } from 'react-native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import LinearGradient from 'react-native-linear-gradient';
+import LoaderSpinner from '../../components/LoaderSpinner';
+import ThemedText from '../../components/ThemedText';
+import ThemedTextInput from '../../components/ThemedTextInput';
 import ThemedView from '../../components/ThemedView';
+import { useTheme } from '../../theme/useTheme';
+import { getCategoryIcon } from '../../theme/entityIcons';
+import { getExpenseCosts } from '../../services/apiService';
 
-const TaxAmountList = ({ route }) => {
-  const { expensesWithTax } = route.params;
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
-  // Calculate total tax amount
-  const totalTaxAmount = expensesWithTax.reduce((sum, item) => sum + parseFloat(item.tax_amount), 0);
+const formatDate = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) { return '—'; }
+  return parsed.toLocaleDateString('en-GB').replace(/\//g, '-');
+};
 
-  const renderHeader = () => (
-    <ThemedView style={styles.headerContainer}>
-      <LinearGradient colors={['#1976D2', '#0D47A1']} style={styles.headerGradient}>
-        <View style={styles.headerContent}>
-          <View>
-            <ThemedText style={styles.headerTitle}>Tax Details</ThemedText>
-            <ThemedText style={styles.headerSubtitle}>Total Tax Amount</ThemedText>
+const AnimatedTaxCard = ({ item, index, palette }) => {
+  const translateY = useRef(new Animated.Value(30)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [index, opacityAnim, translateY]);
+  const cost = parseFloat(item.cost) || 0;
+  const tax = parseFloat(item.taxAmount) || 0;
+
+  return (
+    <Animated.View style={[{ transform: [{ translateY }], opacity: opacityAnim }]}>
+      <View style={[styles.cardWrapper, { backgroundColor: palette.cardBackground, borderColor: palette.cardBorder }]}>
+        <View style={styles.cardTopRow}>
+          <View style={[styles.iconBadge, { backgroundColor: `${palette.cardAccent}22` }]}>
+            <Icon name={getCategoryIcon(item.category)} size={28} color={palette.cardAccent} />
           </View>
-          <ThemedText style={styles.totalAmount}>₹{totalTaxAmount.toLocaleString()}</ThemedText>
+          <View style={styles.details}>
+            <ThemedText style={[styles.itemName, { color: palette.textPrimary }]} numberOfLines={1}>
+              {item.expenseName || 'Expense'}
+            </ThemedText>
+            <View style={styles.dateRow}>
+              <Icon name="event" size={13} color={palette.textSecondary} />
+              <Text style={[styles.dateValue, { color: palette.textSecondary }]}>{formatDate(item.pDate)}</Text>
+            </View>
+          </View>
+          <View style={[styles.taxBadge, { backgroundColor: `${palette.accent}1F` }]}>
+            <ThemedText style={[styles.taxBadgeLabel, { color: palette.accent }]}>TAX</ThemedText>
+            <ThemedText style={[styles.taxBadgeText, { color: palette.accent }]}>
+              ₹{tax.toLocaleString('en-IN')}
+            </ThemedText>
+          </View>
         </View>
-      </LinearGradient>
-    </ThemedView>
+
+        <View style={[styles.metaRow, { borderTopColor: palette.cardBorder }]}>
+          <View style={styles.metaBlock}>
+            <ThemedText style={[styles.metaLabel, { color: palette.textSecondary }]}>Category</ThemedText>
+            <ThemedText style={[styles.metaValue, { color: palette.textPrimary }]} numberOfLines={1}>
+              {item.category || 'Uncategorized'}
+            </ThemedText>
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaBlockRight}>
+            <ThemedText style={[styles.metaLabel, { color: palette.textSecondary }]}>Base Cost</ThemedText>
+            <ThemedText style={[styles.metaValue, { color: palette.textPrimary }]}>
+              ₹{cost.toLocaleString('en-IN')}
+            </ThemedText>
+          </View>
+        </View>
+
+        {item.description ? (
+          <View style={[styles.noteDivider, { borderTopColor: palette.cardBorder }]}>
+            <ThemedText style={[styles.description, { color: palette.textSecondary }]} numberOfLines={2}>
+              {item.description}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+};
+
+const TaxAmountList = () => {
+  const route = useRoute();
+  const { Month, Year } = route?.params || {};
+  const { isDark, palette: themePalettes } = useTheme();
+  const palette = themePalettes.screen('tax');
+
+  const [expensesWithTax, setExpensesWithTax] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await getExpenseCosts();
+      const rows = Array.isArray(response?.data) ? response.data : [];
+      setExpensesWithTax(
+        rows.filter((item) =>
+          (parseFloat(item.taxAmount) || 0) > 0 &&
+          (Month == null || item?.month?.toString() === String(Month)) &&
+          (Year == null || item?.year?.toString() === String(Year))
+        )
+      );
+    } catch (error) {
+      console.error('Error fetching tax details:', error);
+      setExpensesWithTax([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [Month, Year]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+    }, [fetchData])
   );
 
-  const renderItem = ({ item }) => (
-    <ThemedView style={styles.itemCard}>
-      <View style={styles.itemHeader}>
-        <View style={styles.categoryContainer}>
-          <Icon name="category" size={24} color="#1976D2" />
-          <ThemedText style={styles.category}>{item.category}</ThemedText>
-        </View>
-        <ThemedText style={styles.date}>{item.p_date}</ThemedText>
-      </View>
-      
-      <View style={styles.detailsContainer}>
-        <View style={styles.detailRow}>
-          <ThemedText style={styles.label}>Cost:</ThemedText>
-          <ThemedText style={styles.value}>₹{parseFloat(item.cost).toLocaleString()}</ThemedText>
-        </View>
-        <View style={styles.detailRow}>
-          <ThemedText style={styles.label}>Tax Amount:</ThemedText>
-          <ThemedText style={styles.taxAmount}>₹{parseFloat(item.tax_amount).toLocaleString()}</ThemedText>
-        </View>
-        {item.description && (
-          <View style={styles.descriptionContainer}>
-            <ThemedText style={styles.label}>Description:</ThemedText>
-            <ThemedText style={styles.description}>{item.description}</ThemedText>
+  useEffect(() => {
+    if (searchText === '') {
+      setDebouncedSearch('');
+      return;
+    }
+    const timeout = setTimeout(() => setDebouncedSearch(searchText), 300);
+    return () => clearTimeout(timeout);
+  }, [searchText]);
+
+  const filteredData = useMemo(() => {
+    const query = debouncedSearch.trim().toLowerCase();
+    if (!query) { return expensesWithTax; }
+    return expensesWithTax.filter((item) =>
+      (item.category || '').toLowerCase().includes(query) ||
+      (item.expenseName || '').toLowerCase().includes(query) ||
+      (item.description || '').toLowerCase().includes(query)
+    );
+  }, [expensesWithTax, debouncedSearch]);
+
+  const totalTaxAmount = useMemo(
+    () => filteredData.reduce((sum, item) => sum + (parseFloat(item.taxAmount) || 0), 0),
+    [filteredData]
+  );
+
+  const periodLabel = Month && Year
+    ? `${MONTH_NAMES[parseInt(Month, 10) - 1] || ''} ${Year}`.trim()
+    : 'All periods';
+
+  const renderHeader = () => (
+    <LinearGradient
+      colors={isDark ? ['#312e81', '#1e1b4b'] : ['#6366f1', '#4338ca']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.headerGradient}
+    >
+      <Icon name="receipt-long" size={130} color="rgba(255,255,255,0.08)" style={styles.headerDecor} />
+      <View style={styles.headerTopRow}>
+        <View style={styles.headerTextWrap}>
+          <View style={styles.periodPill}>
+            <Icon name="calendar-month" size={14} color="#fff" />
+            <ThemedText style={styles.periodPillText}>{periodLabel}</ThemedText>
           </View>
-        )}
+        </View>
+        <View style={styles.headerAvatar}>
+          <Icon name="account-balance-wallet" size={24} color="#fff" />
+        </View>
       </View>
-    </ThemedView>
+      <View style={[styles.totalCard, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+        <ThemedText style={styles.totalLabel}>Total Tax Paid</ThemedText>
+        <ThemedText style={styles.totalAmount}>₹{totalTaxAmount.toLocaleString('en-IN')}</ThemedText>
+        <ThemedText style={styles.totalSub}>
+          {filteredData.length} {filteredData.length === 1 ? 'entry' : 'entries'}
+        </ThemedText>
+      </View>
+    </LinearGradient>
+  );
+
+  const renderItem = ({ item, index }) => (
+    <AnimatedTaxCard item={item} index={index} palette={palette} />
   );
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.headerSection}>
-        {renderHeader()}
-      </View>
-      <FlatList data={expensesWithTax} keyExtractor={(item) => item.id.toString()} renderItem={renderItem}
-        contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false}/>
-    </ThemedView>
+    <View style={[styles.container, { backgroundColor: palette.background }]}>
+      <ThemedView style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <LoaderSpinner shouldLoad={loading} />
+        <View style={styles.headerSection}>
+          {renderHeader()}
+        </View>
+        <View style={styles.searchSection}>
+          <ThemedTextInput
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Search category, expense or note..."
+            style={[styles.searchInput, { borderColor: palette.cardBorder, backgroundColor: palette.surface, color: palette.textPrimary }]}
+          />
+        </View>
+        <FlatList
+          data={filteredData}
+          keyExtractor={(item, index) => (item.id != null ? item.id.toString() : index.toString())}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Icon name="receipt-long" size={48} color={palette.emptyIcon} />
+              <ThemedText style={[styles.emptyText, { color: palette.textSecondary }]}>
+                {debouncedSearch ? 'No matching tax entries' : 'No tax details found'}
+              </ThemedText>
+            </View>
+          }
+        />
+      </ThemedView>
+    </View>
   );
 };
 
@@ -70,118 +235,199 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    zIndex: 1,
-    height: 100,
-    marginBottom: 5,
-    width: '100%',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
   },
-  headerContainer: {
-    width: '101%',
-    height: '100%',
-    marginBottom: 10,
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
   },
   headerGradient: {
-    borderRadius: 15,
-    margin: 15,
-    padding: 20,
-    elevation: 5,
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    height: '100%',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+    overflow: 'hidden',
   },
-  headerContent: {
+  headerDecor: {
+    position: 'absolute',
+    right: -20,
+    top: -20,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+  headerTextWrap: {
+    flex: 1,
+    marginRight: 12,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#fff',
-    opacity: 0.9,
+  periodPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  periodPillText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 4,
+  },
+  headerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  totalCard: {
+    marginTop: 18,
+    borderRadius: 16,
+    padding: 16,
+  },
+  totalLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
+    marginBottom: 6,
   },
   totalAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    paddingRight: 100,
-
-    
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  totalSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+    marginTop: 4,
   },
   listContainer: {
-    padding: 15,
-    paddingTop: 5,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 100,
   },
-  itemCard: {
-    marginBottom: 15,
-    borderRadius: 12,
-    padding: 15,
+  cardWrapper: {
+    marginBottom: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(221, 215, 215, 0.1)',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    padding: 16,
+
   },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  categoryContainer: {
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  category: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  date: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  detailsContainer: {
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  iconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  label: {
-    fontSize: 14,
-    opacity: 0.7,
+  details: {
+    flex: 1,
   },
-  value: {
-    fontSize: 16,
+  itemName: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+  },
+  dateValue: {
+    fontSize: 13,
     fontWeight: '500',
   },
-  taxAmount: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1976D2',
+  taxBadge: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginLeft: 10,
   },
-  descriptionContainer: {
-    marginTop: 8,
-    paddingTop: 8,
+  taxBadgeLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  taxBadgeText: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(221, 215, 215, 0.1)',
+    marginTop: 14,
+    paddingTop: 12,
+  },
+  metaBlock: {
+    flex: 1,
+  },
+  metaBlockRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  metaDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(148, 163, 184, 0.3)',
+    marginHorizontal: 12,
+  },
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    opacity: 0.7,
+  },
+  metaValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  noteDivider: {
+    borderTopWidth: 1,
+    paddingTop: 10,
+    marginTop: 12,
   },
   description: {
-    fontSize: 14,
-    marginTop: 4,
-    opacity: 0.8,
+    fontSize: 13.5,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 70,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 12,
   },
 });
 

@@ -1,7 +1,10 @@
 import React from 'react';
 import { Modal, View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { useTheme } from '../theme/useTheme';
 
 const LoaderSpinner = ({ shouldLoad }) => {
+  const { colors } = useTheme();
+
   return (
     <Modal
       visible={shouldLoad}
@@ -9,9 +12,9 @@ const LoaderSpinner = ({ shouldLoad }) => {
       animationType="fade"
     >
       <View style={styles.modalBackground}>
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#3498db" />
-          <Text style={styles.loadingText}>Loading...</Text>
+        <View style={[styles.loaderContainer, { backgroundColor: colors.surface }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textPrimary }]}>Loading...</Text>
         </View>
       </View>
     </Modal>
@@ -26,7 +29,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loaderContainer: {
-    backgroundColor: 'white',
     padding: 20,
     borderRadius: 10,
     justifyContent: 'center',
@@ -36,7 +38,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#333',
   },
 });
 

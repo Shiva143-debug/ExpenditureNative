@@ -1,43 +1,22 @@
-import React, { useEffect, useState, useRef, useContext } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import ThemedTextInput from "../../components/ThemedTextInput";
 import ThemedTextAreaInput from "../../components/ThemedTextAreaInput";
-import { StyleSheet, FlatList, View, TouchableOpacity, Alert, Modal, Platform, Animated, Text } from "react-native";
+import { StyleSheet, FlatList, View, TouchableOpacity, Alert, Modal, Animated, Text } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Toast from "react-native-toast-message";
 import LoaderSpinner from "../../components/LoaderSpinner";
-import { useAuth } from "../../context/AuthContext";
 import ThemedView from "../../components/ThemedView";
 import ThemedText from "../../components/ThemedText";
-import { ThemeContext } from "../../context/ThemeContext";
-import { getSavingsData ,deleteSaving, addSaving, updateSavings} from "../../services/apiService";
+import { useTheme } from "../../theme/useTheme";
+import { getSavingsData, deleteSaving, updateSavings } from "../../services/apiService";
+import { LIST_HEADER_GRADIENTS } from "../../theme/palettes";
+import { dateKeyToLocal, formatDateKey, toDateKey } from "../../utils/format";
+import { cancelBackground } from "../../theme/colors";
 
-const savingsPalette = {
-    light: {
-        header: ['#cffafe', '#a5f3fc'],
-        accent: '#0e4f5f',
-        accentSoft: '#4a9ca7',
-        surface: '#ecfeff',
-        cardShadow: '#00000022',
-        iconGlow: 'rgba(14, 79, 95, 0.28)',
-        emptyIcon: '#94a3b8',
-        cardGradient: ['#4a9ca7', '#3d8db3ff'],
-        cardAccent: '#0f172a',
-    },
-    dark: {
-        header: ['#0f172a', '#0e7490'],
-        accent: '#38bdf8',
-        accentSoft: '#67e8f9',
-        surface: '#071524',
-        cardShadow: '#00000055',
-        iconGlow: 'rgba(56, 189, 248, 0.35)',
-        emptyIcon: '#475569',
-        cardGradient: ['#0f172a', '#0e7490'],
-        cardAccent: '#e2e8f0',
-    },
-};
+const HEADER_GRADIENT_DARK = LIST_HEADER_GRADIENTS.savingsDark;
 
 const AnimatedSavingsCard = ({ item, index, onDelete, onEdit, palette }) => {
     const translateY = useRef(new Animated.Value(30)).current;
@@ -60,7 +39,8 @@ const AnimatedSavingsCard = ({ item, index, onDelete, onEdit, palette }) => {
                 useNativeDriver: true,
             }),
         ]).start();
-    }, [index]);
+        }, [index, opacityAnim, translateY]);
+
 
     const handleDeletePress = () => {
         Animated.sequence([
@@ -92,63 +72,61 @@ const AnimatedSavingsCard = ({ item, index, onDelete, onEdit, palette }) => {
         ]).start(() => onEdit?.(item));
     };
 
+    const formattedDate = formatDateKey(item.date);
+
     return (
         <Animated.View style={[{ transform: [{ translateY }], opacity: opacityAnim }]}>
-            <LinearGradient colors={palette.cardGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.cardWrapper, { shadowColor: palette.cardShadow }]}>
-                <TouchableOpacity activeOpacity={0.82} onPress={() => onEdit?.(item)} style={styles.gradientTouchable}>
-                    <View style={styles.cardContent}>
-                        <View style={styles.leftSection}>
-                            <View style={[styles.iconBadge, { backgroundColor: `${palette.cardAccent}22` }]}>
-                                <Icon name="savings" size={32} color={palette.cardAccent} />
-                            </View>
-                            <View style={styles.savingDetails}>
-
-                                <ThemedText style={[styles.amountValue, { color: palette.cardAccent }]}>
-                                    ₹{parseFloat(item.amount).toLocaleString('en-IN')}
-                                </ThemedText>
-                                <View style={styles.dateRow}>
-                                    <Icon name="event" size={13} color={`${palette.cardAccent}cc`} />
-                                    <Text style={[styles.dateValue, { color: `${palette.cardAccent}cc` }]}>{new Date(item.date).toLocaleDateString('en-GB').replace(/\//g, '-')}</Text>
-                                </View>
-                                {item.note && <ThemedText style={[styles.savingLabel, { color: palette.cardAccent }]}>
-                                    {item.note}
-                                </ThemedText>}
+            <View style={[styles.cardWrapper, { backgroundColor: palette.cardBackground, borderColor: palette.cardBorder, shadowColor: palette.cardShadow }]}>
+                <TouchableOpacity activeOpacity={0.82} onPress={() => onEdit?.(item)} style={styles.cardContent}>
+                    <View style={styles.cardTopRow}>
+                        <View style={[styles.iconBadge, { backgroundColor: palette.iconBackground(0.18) }]}>
+                            <Icon name="savings" size={26} color={palette.accent} />
+                        </View>
+                        <View style={styles.savingDetails}>
+                            <ThemedText style={[styles.amountValue, { color: palette.textPrimary }]}>
+                                ₹{parseFloat(item.amount).toLocaleString('en-IN')}
+                            </ThemedText>
+                            <View style={styles.dateRow}>
+                                <Icon name="event" size={13} color={palette.textSecondary} />
+                                <Text style={[styles.dateValue, { color: palette.textSecondary }]}>{formattedDate}</Text>
                             </View>
                         </View>
-                        <View style={styles.rightSection}>
-
-                            <View style={styles.actionButtons}>
-                                <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
-                                    <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
-                                        <Icon name="edit-note" size={18} color={palette.cardAccent} />
-                                    </Animated.View>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
-                                    <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
-                                        <Icon name="delete-outline" size={18} color="#dc2626" />
-                                    </Animated.View>
-                                </TouchableOpacity>
-                            </View>
+                        <View style={styles.actionButtons}>
+                            <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
+                                <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
+                                    <Icon name="edit-note" size={18} color={palette.accent} />
+                                </Animated.View>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
+                                <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
+                                    <Icon name="delete-outline" size={18} color="#dc2626" />
+                                </Animated.View>
+                            </TouchableOpacity>
                         </View>
                     </View>
+                    {item.note ? (
+                        <View style={[styles.noteDivider, { borderTopColor: palette.cardBorder }]}>
+                            <ThemedText style={[styles.savingLabel, { color: palette.textSecondary }]} numberOfLines={2}>
+                                Notes: {item.note}
+                            </ThemedText>
+                        </View>
+                    ) : null}
                 </TouchableOpacity>
-            </LinearGradient>
+            </View>
         </Animated.View>
     );
 };
 
 const SavingsList = () => {
-    const { id } = useAuth();
-    const { theme } = useContext(ThemeContext);
+    const { palette: themePalettes, isDark } = useTheme();
     const [savings, setSavings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchText, setSearchText] = useState('');
     const [filteredSavings, setFilteredSavings] = useState([]);
-    const [modalVisible, setModalVisible] = useState(false);
     const [amount, setAmount] = useState("");
     const [note, setNote] = useState("");
     const [date, setDate] = useState('');
-    const palette = theme === 'dark' ? savingsPalette.dark : savingsPalette.light;
+    const palette = themePalettes.list.savings;
 
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingSaving, setEditingSaving] = useState(null);
@@ -159,7 +137,7 @@ const SavingsList = () => {
     useFocusEffect(
         React.useCallback(() => {
             fetchData();
-        }, [id])
+        }, [])
     );
 
     // Filter savings based on search text
@@ -176,105 +154,69 @@ const SavingsList = () => {
     }, [savings, searchText]);
 
     const fetchData = async () => {
-        setLoading(true)
-        const data = await getSavingsData(id);
-        setSavings(data || []);
+        setLoading(true);
+        const response = await getSavingsData();
+        setSavings(response?.data || []);
         setLoading(false);
     };
-
 
     const handleDateChange = (_, selectedDate) => {
         setShowDatePicker(false);
         if (selectedDate) {
-            const formattedDate = selectedDate.toISOString().split('T')[0];
-            setDate(formattedDate);
+            setDate(toDateKey(selectedDate));
         }
     };
 
-    const handleAddSaving = async () => {
-        // Validate required fields
-        if (!amount) {
-            Toast.show({ type: "error", text1: "Validation Error", text2: "Please Enter Amount", position: "top" });
-            return;
-        }
+    const totalSavings = filteredSavings.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
 
-        else if (!date) {
-            Toast.show({ type: "error", text1: "Validation Error", text2: "Please select a date", position: "top" });
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const savingData = { id, amount, date, note };
-            await addSaving(savingData);
-            Toast.show({
-                type: "success", text1: "Success", text2: "Saving Data added successfully", position: "top", visibilityTime: 3000, autoHide: true
-            });
-
-        } catch (error) {
-            console.error('Error submitting Saving Data:', error);
-            Toast.show({ type: "error", text1: "Error", text2: "Failed to add Saving Data", position: "top" });
-        } finally {
-            setLoading(false);
-            handleClear();
-            setModalVisible(false);
-            await fetchData();
-        }
+  const renderHeader = () => {
+    const headerColors = {
+      gradient: HEADER_GRADIENT_DARK,
+      title: '#ffffff',
+      sub: 'rgba(255,255,255,0.85)',
+      decor: 'rgba(255,255,255,0.08)',
+      avatarBg: 'rgba(255,255,255,0.22)',
+      totalBg: 'rgba(255,255,255,0.16)',
     };
 
-
-    const handleClear = () => {
-        setAmount("");
-        setNote("");
-        setDate('');
-
-    }
-    const totalSavings = savings.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
-
-    const renderHeader = () => (
-        <LinearGradient colors={palette.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
-            <View style={styles.headerTopRow}>
-                <View>
-                    <ThemedText style={[styles.headerTitle, { color: palette.accent }]}>Savings</ThemedText>
-                    <ThemedText style={[styles.headerSubtitle, { color: palette.accentSoft }]}>Manage your savings</ThemedText>
-                </View>
-                <Icon name="savings" size={40} color={palette.accent} />
-            </View>
-            <View style={[styles.totalCard, { backgroundColor: palette.iconGlow }]}>
-                <View style={styles.totalCardContent}>
-                    <View>
-                        <ThemedText style={[styles.totalLabel, { color: palette.accentSoft }]}>Total Savings</ThemedText>
-                        <ThemedText style={[styles.totalAmount, { color: palette.accent }]}>₹{totalSavings.toLocaleString('en-IN')}</ThemedText>
-                    </View>
-                    {/* <TouchableOpacity
-                        style={styles.addButtonHeader}
-                        onPress={() => setModalVisible(true)}
-                    >
-                        <Icon name="add-circle" size={48} color={palette.accent} />
-                    </TouchableOpacity> */}
-                </View>
-            </View>
-        </LinearGradient>
+    return (
+      <LinearGradient colors={headerColors.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+        <Icon name="savings" size={130} color={headerColors.decor} style={styles.headerDecor} />
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerTextWrap}>
+            <ThemedText style={[styles.headerTitle, { color: headerColors.title }]}>Savings</ThemedText>
+            <ThemedText style={[styles.headerSubtitle, { color: headerColors.sub }]}>Manage your savings</ThemedText>
+          </View>
+          <View style={[styles.headerAvatar, { backgroundColor: headerColors.avatarBg }]}>
+            <Icon name="savings" size={24} color={headerColors.title} />
+          </View>
+        </View>
+        <View style={[styles.totalCard, { backgroundColor: headerColors.totalBg }]}>
+          <ThemedText style={[styles.totalLabel, { color: headerColors.sub }]}>Total Savings</ThemedText>
+          <ThemedText style={[styles.totalAmount, { color: headerColors.title }]}>₹{totalSavings.toLocaleString('en-IN')}</ThemedText>
+        </View>
+      </LinearGradient>
     );
+  };
 
     const onDeleteSaving = (savingId) => {
         Alert.alert(
             "Delete Saving",
             "Are you sure you want to delete this saving?",
             [
-                {
-                    text: "Cancel",
-                    style: "cancel"
-                },
+                { text: "Cancel", style: "cancel" },
                 {
                     text: "Delete",
                     onPress: async () => {
                         try {
                             setLoading(true);
-                            await deleteSaving(savingId, id);
-                            // After successful deletion, refresh the savings list
-                            await fetchData();
-                            Alert.alert("Success", "Saving deleted successfully");
+                            const response = await deleteSaving(savingId);
+                            if (response?.status) {
+                                await fetchData();
+                                Alert.alert("Success", response.message || "Saving deleted successfully");
+                            } else {
+                                Alert.alert("Error", response?.message || "Failed to delete saving");
+                            }
                         } catch (error) {
                             console.error("Error deleting saving:", error);
                             Alert.alert("Error", "Failed to delete saving");
@@ -293,10 +235,9 @@ const SavingsList = () => {
         setEditingSaving(item);
         setAmount(item.amount.toString());
         setNote(item.note || '');
-        setDate(item.date);
+        setDate(toDateKey(item.date));
         setEditModalVisible(true);
     };
-
 
     const handleUpdateSavings = async () => {
         if (!editingSaving || !amount || !date) {
@@ -312,24 +253,31 @@ const SavingsList = () => {
         try {
             setDialogLoading(true);
 
-            await updateSavings(editingSaving.id, {
-                id,        // user_id
+            const response = await updateSavings(editingSaving.id, {
                 amount,
                 date,
                 note
             });
 
-            Toast.show({
-                type: "success",
-                text1: "Success",
-                text2: "Savings updated successfully",
-                position: "top"
-            });
+            if (response?.status) {
+                Toast.show({
+                    type: "success",
+                    text1: "Success",
+                    text2: response.message || "Savings updated successfully",
+                    position: "top"
+                });
 
-            setEditModalVisible(false);
-            setEditingSaving(null);
-            await fetchData();
-
+                setEditModalVisible(false);
+                setEditingSaving(null);
+                await fetchData();
+            } else {
+                Toast.show({
+                    type: "error",
+                    text1: "Error",
+                    text2: response?.message || "Failed to update savings",
+                    position: "top"
+                });
+            }
         } catch (error) {
             console.error("Error updating savings:", error);
             Toast.show({
@@ -354,107 +302,109 @@ const SavingsList = () => {
     );
 
     return (
-        <ThemedView style={[styles.container, { backgroundColor: palette.surface }]}>
-            <Toast />
-            <LoaderSpinner shouldLoad={loading} />
-            <View style={styles.headerSection}>
-                {renderHeader()}
-            </View>
-            <View style={styles.searchSection}>
-                <ThemedTextInput
-                    value={searchText}
-                    onChangeText={setSearchText}
-                    placeholder="Search note,amount..."
-                    style={styles.searchInput}
-                />
-            </View>
-            <FlatList
-                data={filteredSavings} keyExtractor={(item) => item.id.toString()} renderItem={renderItem}
-                contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Icon name="savings" size={48} />
-                        <ThemedText style={styles.emptyText}>No savings Found</ThemedText>
-                    </View>
-                }
-            />
-
-            {/* Add Saving Modal */}
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={editModalVisible}
-                onRequestClose={() => setEditModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={[
-                        styles.modalContent,
-                        { backgroundColor: theme === 'dark' ? '#111' : '#fff' }
-                    ]}>
-                        <View style={styles.modalHeader}>
-                            <ThemedText style={styles.modalTitle}>Edit Saving</ThemedText>
-                            <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                                <Icon name="close" size={24} color={theme === 'dark' ? '#fff' : '#000'} />
-                            </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+            <LinearGradient colors={palette.background} style={StyleSheet.absoluteFillObject} />
+            <ThemedView style={[styles.container, { backgroundColor: 'transparent' }]}>
+                <Toast />
+                <LoaderSpinner shouldLoad={loading} />
+                <View style={styles.headerSection}>
+                    {renderHeader()}
+                </View>
+                <View style={styles.searchSection}>
+                    <ThemedTextInput
+                        value={searchText}
+                        onChangeText={setSearchText}
+                        placeholder="Search note,amount..."
+                        style={[styles.searchInput, { borderColor: palette.cardBorder, backgroundColor: palette.cardBackground, color: palette.textPrimary }]}
+                    />
+                </View>
+                <FlatList
+                    data={filteredSavings}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={renderItem}
+                    contentContainerStyle={styles.listContainer}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Icon name="savings" size={48} color={palette.emptyIcon} />
+                            <ThemedText style={[styles.emptyText, { color: palette.textSecondary }]}>No savings Found</ThemedText>
                         </View>
+                    }
+                />
 
-                        <ThemedText style={styles.inputLabel}>Amount (₹)</ThemedText>
-                        <ThemedTextInput
-                            style={styles.input}
-                            keyboardType="numeric"
-                            value={amount}
-                            onChangeText={setAmount}
-                        />
+                {/* Edit Saving Modal */}
+                <Modal
+                    animationType="slide"
+                    transparent={true}
+                    visible={editModalVisible}
+                    onRequestClose={() => setEditModalVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={[styles.modalContent, { backgroundColor: palette.dialogBackground }]}>
+                            <View style={styles.modalHeader}>
+                                <ThemedText style={[styles.modalTitle, { color: palette.textPrimary }]}>Edit Saving</ThemedText>
+                                <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                                    <Icon name="close" size={24} color={palette.textPrimary} />
+                                </TouchableOpacity>
+                            </View>
 
-                        <ThemedText style={styles.inputLabel}>Select Date</ThemedText>
-                        <TouchableOpacity
-                            onPress={() => setShowDatePicker(true)}
-                            style={styles.dateButton}
-                        >
-                            <Text style={styles.dateButtonText}>
-                                {new Date(date).toLocaleDateString('en-GB').replace(/\//g, '-') || 'Select Date'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        {showDatePicker && (
-                            <DateTimePicker
-                                value={date ? new Date(date) : new Date()}
-                                mode="date"
-                                display="default"
-                                onChange={handleDateChange}
+                            <ThemedText style={[styles.inputLabel, { color: palette.textPrimary }]}>Amount (₹)</ThemedText>
+                            <ThemedTextInput
+                                style={[styles.input, { borderColor: palette.cardBorder, backgroundColor: palette.pickerBackground, color: palette.textPrimary }]}
+                                keyboardType="numeric"
+                                value={amount}
+                                onChangeText={setAmount}
                             />
-                        )}
 
-                        <ThemedText style={styles.inputLabel}>Note (Optional)</ThemedText>
-                        <ThemedTextAreaInput
-                            style={styles.textArea}
-                            value={note}
-                            onChangeText={setNote}
-                        />
-
-                        <View style={styles.modalButtons}>
+                            <ThemedText style={[styles.inputLabel, { color: palette.textPrimary }]}>Select Date</ThemedText>
                             <TouchableOpacity
-                                style={[styles.button, styles.cancelButton]}
-                                onPress={() => setEditModalVisible(false)}
+                                onPress={() => setShowDatePicker(true)}
+                                style={[styles.dateButton, { borderColor: palette.cardBorder }]}
                             >
-                                <Text style={styles.buttonText}>Cancel</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.button, styles.addButton]}
-                                onPress={handleUpdateSavings}
-                                disabled={dialogLoading}
-                            >
-                                <Text style={styles.addButtonText}>
-                                    {dialogLoading ? "Updating..." : "Update"}
+                                <Text style={[styles.dateButtonText, { color: palette.textPrimary }]}>
+                                    {formatDateKey(date) || 'Select Date'}
                                 </Text>
                             </TouchableOpacity>
+
+                            {showDatePicker && (
+                                <DateTimePicker
+                                    value={dateKeyToLocal(date) || new Date()}
+                                    mode="date"
+                                    display="default"
+                                    onChange={handleDateChange}
+                                />
+                            )}
+
+                            <ThemedText style={[styles.inputLabel, { color: palette.textPrimary }]}>Note (Optional)</ThemedText>
+                            <ThemedTextAreaInput
+                                style={[styles.textArea, { borderColor: palette.cardBorder, backgroundColor: palette.pickerBackground, color: palette.textPrimary }]}
+                                value={note}
+                                onChangeText={setNote}
+                            />
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity
+                                    style={[styles.button, styles.cancelButton, { backgroundColor: cancelBackground(isDark) }]}
+                                    onPress={() => setEditModalVisible(false)}
+                                >
+                                    <Text style={[styles.buttonText, { color: palette.textPrimary }]}>Cancel</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.button, styles.addButton, { backgroundColor: palette.accent }]}
+                                    onPress={handleUpdateSavings}
+                                    disabled={dialogLoading}
+                                >
+                                    <Text style={styles.addButtonText}>
+                                        {dialogLoading ? "Updating..." : "Update"}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
-                </View>
-            </Modal>
-
-        </ThemedView>
+                </Modal>
+            </ThemedView>
+        </View>
     );
 };
 
@@ -463,141 +413,149 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     headerSection: {
-        zIndex: 1,
-        paddingHorizontal: 6,
+        paddingHorizontal: 16,
         paddingTop: 12,
-        paddingBottom: 16,
+        paddingBottom: 10,
     },
     searchSection: {
         paddingHorizontal: 16,
-        paddingBottom: 8,
+        paddingBottom: 10,
     },
     searchInput: {
         borderWidth: 1,
-        borderColor: 'black',
-        borderRadius: 8,
-        padding: 12,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         fontSize: 16,
-        backgroundColor: 'transparent',
     },
     headerGradient: {
-        borderRadius: 20,
-        padding: 24,
-        elevation: 6,
+        borderRadius: 22,
+        paddingHorizontal: 22,
+        paddingVertical: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+        elevation: 6,
+        overflow: 'hidden',
+    },
+    headerDecor: {
+        position: 'absolute',
+        right: -20,
+        top: -20,
     },
     headerTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 20,
+        alignItems: 'center',
+    },
+    headerTextWrap: {
+        flex: 1,
+        marginRight: 12,
+    },
+    headerAvatar: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: 'rgba(255,255,255,0.22)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 28,
-        fontWeight: '700',
-        marginBottom: 4,
+        fontWeight: '800',
+        color: '#ffffff',
+        letterSpacing: 0.3,
     },
     headerSubtitle: {
-        fontSize: 15,
+        fontSize: 13.5,
+        color: 'rgba(255, 255, 255, 0.85)',
         fontWeight: '500',
+        marginTop: 4,
     },
     totalCard: {
-        borderRadius: 14,
+        marginTop: 18,
+        borderRadius: 16,
         padding: 16,
-    },
-    totalCardContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
     },
     totalLabel: {
         fontSize: 13,
+        color: 'rgba(255,255,255,0.85)',
         fontWeight: '500',
         marginBottom: 6,
     },
     totalAmount: {
-        fontSize: 28,
-        fontWeight: '700',
-    },
-    addButtonHeader: {
-        justifyContent: 'center',
-        alignItems: 'center',
+        fontSize: 26,
+        fontWeight: '800',
+        color: '#fff',
     },
     listContainer: {
-        padding: 6,
-        paddingTop: 8,
+        paddingHorizontal: 16,
+        paddingTop: 4,
+        paddingBottom: 100,
     },
     cardWrapper: {
         marginBottom: 14,
-        borderRadius: 16,
-        overflow: 'hidden',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-    },
-    gradientCard: {
-        borderRadius: 16,
-        overflow: 'hidden',
-    },
-    gradientTouchable: {
-        flex: 1,
-        borderRadius: 16,
+        borderRadius: 18,
+        borderWidth: 1,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
     },
     cardContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 18,
-        paddingVertical: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
     },
-    leftSection: {
+    cardTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        flex: 1,
     },
     iconBadge: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 14,
-        color: "#ffffff"
+        marginRight: 12,
     },
     savingDetails: {
         flex: 1,
     },
     savingLabel: {
+        fontSize: 12.5,
+        fontWeight: '500',
+    },
+    noteLabel: {
         fontSize: 12,
-        fontWeight: '600',
-        marginTop: 6,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 3,
+    },
+    noteDivider: {
+        borderTopWidth: 1,
+        paddingTop: 8,
+        marginTop: 10,
     },
     dateRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+        marginTop: 3,
     },
     dateValue: {
         fontSize: 13,
         fontWeight: '500',
     },
-    rightSection: {
-        marginLeft: 12,
-        alignItems: 'flex-end',
-    },
     amountValue: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '700',
-        marginBottom: 8,
     },
     actionButtons: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 6,
+        marginLeft: 8,
     },
     editButton: {
         padding: 6,
@@ -609,31 +567,30 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 60,
+        paddingVertical: 70,
     },
     emptyText: {
         fontSize: 16,
         fontWeight: '500',
         marginTop: 12,
-        opacity: 0.6,
     },
     // Modal styles
     modalOverlay: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(2, 6, 23, 0.6)',
         padding: 20,
     },
     modalContent: {
         width: '100%',
-        borderRadius: 15,
-        padding: 20,
-        elevation: 5,
+        borderRadius: 20,
+        padding: 22,
+        elevation: 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -646,15 +603,28 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     inputLabel: {
-        fontSize: 16,
-        marginBottom: 5,
-        marginTop: 10,
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 6,
+        marginTop: 12,
     },
     input: {
         width: '100%',
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 16,
     },
     textArea: {
         width: '100%',
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 16,
+        minHeight: 70,
+        textAlignVertical: 'top',
     },
     modalButtons: {
         flexDirection: 'row',
@@ -662,37 +632,36 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     button: {
-        padding: 12,
-        borderRadius: 8,
-        minWidth: '45%',
-        alignItems: 'center',
+        padding: 13,
+        borderRadius: 12,
+        flex: 1,
     },
     cancelButton: {
-        backgroundColor: '#ccc',
+        marginRight: 10,
+        alignItems: 'center',
     },
     addButton: {
-        backgroundColor: '#0e4f5f',
+        marginLeft: 10,
+        alignItems: 'center',
     },
     buttonText: {
         fontSize: 16,
-        color: '#333',
+        fontWeight: '600',
     },
     addButtonText: {
         fontSize: 16,
         color: '#fff',
-        fontWeight: 'bold',
+        fontWeight: '700',
     },
     dateButton: {
         padding: 15,
-        borderRadius: 8,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#ccc',
         marginBottom: 10,
     },
     dateButtonText: {
         fontSize: 16,
         textAlign: 'center',
-        color: 'white',
     },
 });
 

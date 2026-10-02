@@ -1,37 +1,21 @@
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, Modal } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Toast from "react-native-toast-message";
-import DropDownPicker from 'react-native-dropdown-picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedText from '../../components/ThemedText';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import LinearGradient from 'react-native-linear-gradient';
 import { getIncomeSources, addIncome, addIncomeSource, } from '../../services/apiService';
 import { useFocusEffect } from "@react-navigation/native";
-import ThemedView from "../../components/ThemedView";
 import LoaderSpinner from "../../components/LoaderSpinner";
-import { useAuth } from "../../context/AuthContext";
-import { ThemeContext } from "../../context/ThemeContext";
+import { useTheme } from "../../theme/useTheme";
+import { inputStyles as formStyles } from '../../styles';
+import FormDropdown from '../../components/FormDropdown';
 
 const Source = () => {
-  const { id } = useAuth();
-  const { theme } = useContext(ThemeContext);
-
-  const palette = useMemo(() => theme === 'dark'
-    ? {
-      background: '#0f172a',
-      cardBorder: 'rgba(148, 163, 184, 0.16)',
-      textPrimary: '#e2e8f0',
-      textSecondary: '#94a3b8',
-    }
-    : {
-      background: '#f5f7fb',
-      cardBorder: 'rgba(15, 23, 42, 0.08)',
-      textPrimary: '#0f172a',
-      textSecondary: '#475569',
-    }, [theme]
-  );
+  const { palette: themePalettes } = useTheme();
+  const palette = themePalettes.form;
 
   const [sourceName, setSourceName] = useState("");
   const [visible, setVisible] = useState(false);
@@ -44,8 +28,8 @@ const Source = () => {
   const [sourceData, setSourceData] = useState([]);
   const [refreshFlag, setRefreshFlag] = useState(false);
 
-  const handleSourceChange = (sourceName) => setSourceName(sourceName);
-  const handleAmountChange = (amount) => setAmount(amount);
+  const handleSourceChange = value => setSourceName(value);
+  const handleAmountChange = value => setAmount(value);
   const [isAddingSource, setIsAddingSource] = useState(false);
   const [isAddingSourceName, setIsAddingSourceName] = useState(false);
 
@@ -71,19 +55,19 @@ const Source = () => {
       );
   
   useEffect(() => {
-    if (!id) return;
-
     const fetchSources = async () => {
       try {
-        const data = await getIncomeSources(id);
-        console.log(data);
-        if (data) {
+        const response = await getIncomeSources();
+        if (response?.status) {
+          const data = response.data;
           const transformedData = data.map(item => ({
-            label: item.source_name,
-            value: item.source_name,
+            label: item.sourceName,
+            value: item.id,
             key: item.id.toString()
           }));
           setSourceData(transformedData);
+        } else {
+          Toast.show({ type: "error", text1: "Error", text2: response?.message || "Failed to fetch sources", position: "top" });
         }
 
       } catch (error) {
@@ -93,7 +77,7 @@ const Source = () => {
     };
 
     fetchSources();
-  }, [id, refreshFlag]);
+  }, [refreshFlag]);
 
   const onSourceSubmit = async () => {
     // Validate required fields
@@ -113,11 +97,17 @@ const Source = () => {
     }
     try {
       setIsAddingSource(true);
-      const sourceData = { id: id, source: sourceValue, amount, date };
-      await addIncome(sourceData);
-      Toast.show({
-        type: "success", text1: "Success", text2: "Source added successfully", position: "top", visibilityTime: 3000, autoHide: true
-      });
+      const payload = { sourceId: sourceValue, amount, date };
+      const response = await addIncome(payload);
+      if (response?.status) {
+        Toast.show({
+          type: "success", text1: "Success", text2: response.message || "Source added successfully", position: "top", visibilityTime: 3000, autoHide: true
+        });
+      } else {
+        Toast.show({
+          type: "error", text1: "Error", text2: response?.message || "Failed to add Source", position: "top"
+        });
+      }
 
     } catch (error) {
       console.error('Error submitting Source:', error);
@@ -147,12 +137,18 @@ const Source = () => {
     }
     try {
       setIsAddingSourceName(true);
-      let sourceData = { id, sourceName }
-      await addIncomeSource(sourceData);
-      Toast.show({
-        type: "success", text1: "Success", text2: "Source Name added successfully", position: "top", visibilityTime: 3000, autoHide: true
-      });
-      setRefreshFlag((prev) => !prev);
+      const payload = { sourceName };
+      const response = await addIncomeSource(payload);
+      if (response?.status) {
+        Toast.show({
+          type: "success", text1: "Success", text2: response.message || "Source Name added successfully", position: "top", visibilityTime: 3000, autoHide: true
+        });
+        setRefreshFlag((prev) => !prev);
+      } else {
+        Toast.show({
+          type: "error", text1: "Error", text2: response?.message || "Failed to add Source Name", position: "top"
+        });
+      }
 
     } catch (error) {
       console.error('Error submitting Source Name:', error);
@@ -168,32 +164,33 @@ const Source = () => {
   return (
     <>
       <LoaderSpinner shouldLoad={isAddingSource || isAddingSourceName} />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <ThemedView style={styles.container}>
-          <ThemedView style={styles.formContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
+          <View style={formStyles.fieldGroup}>
             <View style={styles.sourceHeader}>
-              <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Select Source of Income:</ThemedText>
+              <ThemedText style={[formStyles.label, { color: palette.textSecondary, marginBottom: 0 }]}>Select Source of Income:</ThemedText>
               <TouchableOpacity onPress={onDialogOpen}>
-                <Icon name="add-circle" size={24} color="#4CAF50" />
+                <Icon name="add-circle" size={24} color={palette.primary} />
               </TouchableOpacity>
             </View>
 
-            <DropDownPicker open={sourceOpen} value={sourceValue} items={sourceData} setOpen={setSourceOpen}
-              setValue={setSourceValue} setItems={setSourceData} placeholder="Select Source"
-              style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-              dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-              textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
-              listMode="SCROLLVIEW"
-              theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+            <FormDropdown
+              open={sourceOpen} onOpenChange={setSourceOpen}
+              value={sourceValue} onChange={setSourceValue}
+              items={sourceData} setItems={setSourceData}
+              placeholder="Select Source" palette={palette} zClosed={1000}
             />
+          </View>
 
-            <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Amount (₹) :</ThemedText>
+          <View style={formStyles.fieldGroup}>
+            <ThemedText style={[formStyles.label, { color: palette.textSecondary }]}>Amount (₹) :</ThemedText>
             <ThemedTextInput placeholder="Enter Amount" value={amount}
-              onChangeText={handleAmountChange} keyboardType="numeric" style={styles.input} />
+              onChangeText={handleAmountChange} keyboardType="numeric" style={[formStyles.input, { borderColor: palette.fieldBorder }]} />
+          </View>
 
-            <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Date:</ThemedText>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
-              <ThemedText style={styles.dateButtonText}>
+          <View style={formStyles.fieldGroup}>
+            <ThemedText style={[formStyles.label, { color: palette.textSecondary }]}>Date:</ThemedText>
+            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[formStyles.dateButton, { borderColor: palette.fieldBorder }]}>
+              <ThemedText style={[formStyles.dateButtonText, { color: date ? palette.textPrimary : palette.textSecondary }]}>
                 {date ? date : 'Select Date'}
               </ThemedText>
             </TouchableOpacity>
@@ -202,51 +199,49 @@ const Source = () => {
               <DateTimePicker value={date ? new Date(date) : new Date()}
                 mode="date" display="default" onChange={handleDateChange} />
             )}
+          </View>
 
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={() => { setSourceValue(""); setAmount(""); setDate(''); }} style={styles.clearButton}>
-                <LinearGradient colors={['#757575', '#616161']} style={styles.buttonGradient}>
-                  <ThemedText style={styles.buttonText}>Clear</ThemedText>
-                </LinearGradient>
-              </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity onPress={() => { setSourceValue(""); setAmount(""); setDate(''); }} style={styles.clearButton}>
+              <LinearGradient colors={['#64748b', '#475569']} style={formStyles.buttonGradient}>
+                <ThemedText style={styles.buttonText}>Clear</ThemedText>
+              </LinearGradient>
+            </TouchableOpacity>
 
-              <TouchableOpacity onPress={onSourceSubmit} style={styles.submitButton}>
-                <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                  <ThemedText style={styles.buttonText}>Submit</ThemedText>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </ThemedView>
+            <TouchableOpacity onPress={onSourceSubmit} style={styles.submitButton}>
+              <LinearGradient colors={['#4CAF50', '#2E7D32']} style={formStyles.buttonGradient}>
+                <ThemedText style={styles.buttonText}>Submit</ThemedText>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+      </ScrollView>
 
-          <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={hideDialog}>
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContainer}>
-                <ThemedView style={styles.modalContent}>
-                  <ThemedText style={styles.modalTitle}>Add New Source</ThemedText>
+          <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={hideDialog}>
+            <View style={[styles.modalOverlay, { backgroundColor: palette.glassOverlay }]}>
+              <View style={[styles.modalContainer, { backgroundColor: palette.glassContainer, borderColor: palette.glassBorder }]}>
+                <ThemedText style={[styles.modalTitle, { color: palette.textPrimary }]}>Add New Source</ThemedText>
 
-                  <ThemedView style={styles.inputContainer}>
-                    <ThemedText style={styles.modalLabel}>Source Name:</ThemedText>
-                    <ThemedTextInput placeholder="Enter Source Name" value={sourceName} onChangeText={handleSourceChange} style={styles.modalInput} />
-                  </ThemedView>
+                <View style={styles.inputContainer}>
+                  <ThemedText style={[styles.modalLabel, { color: palette.textSecondary }]}>Source Name:</ThemedText>
+                  <ThemedTextInput placeholder="Enter Source Name" value={sourceName} onChangeText={handleSourceChange} style={[styles.modalInput, { borderColor: palette.fieldBorder }]} />
+                </View>
 
-                  <View style={styles.modalButtonContainer}>
-                    <TouchableOpacity onPress={hideDialog} style={styles.modalButton}>
-                      <LinearGradient colors={['#757575', '#616161']} style={styles.buttonGradient}>
-                        <ThemedText style={styles.buttonText}>Close</ThemedText>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleSourceSubmit} style={styles.modalButton}>
-                      <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                        <ThemedText style={styles.buttonText}>Add </ThemedText>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-                </ThemedView>
+                <View style={styles.modalButtonContainer}>
+                  <TouchableOpacity onPress={hideDialog} style={styles.modalButton}>
+                    <LinearGradient colors={['#64748b', '#475569']} style={formStyles.buttonGradient}>
+                      <ThemedText style={styles.buttonText}>Close</ThemedText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleSourceSubmit} style={styles.modalButton}>
+                    <LinearGradient colors={['#4CAF50', '#2E7D32']} style={formStyles.buttonGradient}>
+                      <ThemedText style={styles.buttonText}>Add</ThemedText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </Modal>
-        </ThemedView>
-      </ScrollView>
+       
       <Toast />
     </>
   );
@@ -256,82 +251,22 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
   },
-  container: {
-    flex: 1,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  headerGradient: {
-    padding: 20,
-    borderRadius: 10,
-    margin: 10,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-    textAlign: 'center',
-  },
-  formContainer: {
-    padding: 2,
-  },
   sourceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  picker: {
-    borderWidth: 1,
-    borderRadius: 12,
-    height: 48,
-    marginBottom: 50,
-  },
-  dropdownList: {
-    borderWidth: 1,
-    borderRadius: 12,
-    maxHeight: 200,
-  },
-  dropdownText: {
-    fontSize: 15,
-  },
-  input: {
-    marginBottom: 40,
-  },
-  dateButton: {
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    marginBottom: 40,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    textAlign: 'center',
+    marginBottom: 8,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
     marginTop: 10,
   },
   clearButton: {
     flex: 1,
-    marginRight: 8,
   },
   submitButton: {
     flex: 1,
-    marginLeft: 8,
-  },
-  buttonGradient: {
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
   },
   buttonText: {
     color: '#FFF',
@@ -342,21 +277,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(190, 189, 189, 0.5)',
-  },
-  modalContainer: {
-    height: 300,
-    width: '90%',
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  modalContent: {
-    flex: 1,
     padding: 20,
   },
+  modalContainer: {
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    padding: 24,
+  },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
@@ -366,20 +297,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inputContainer: {
-    marginBottom: 20,
+    width: '100%',
+    marginBottom: 12,
   },
   modalInput: {
-    marginBottom: 10,
-    borderRadius: 8,
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginVertical: 0,
   },
   modalButtonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    // marginTop: 10,
+    gap: 12,
   },
   modalButton: {
     flex: 1,
-    marginHorizontal: 5,
   },
 });
 

@@ -1,19 +1,15 @@
 // components/ThemedText.js
-import React, { useContext } from 'react';
+import React from 'react';
 import { Text, StyleSheet } from 'react-native';
-import { ThemeContext } from '../context/ThemeContext';
+import { useTheme } from '../theme/useTheme';
 
 
 const ThemedText = ({ children, style, ...props }) => {
-  const { theme } = useContext(ThemeContext);
+  const { colors } = useTheme();
 
   return (
     <Text
-      style={[
-        styles.base,
-        theme === 'dark' ? styles.darkText : styles.lightText,
-        style,
-      ]}
+      style={[styles.base, { color: colors.textPrimary }, style]}
       {...props}
     >
       {children}
@@ -24,12 +20,6 @@ const ThemedText = ({ children, style, ...props }) => {
 const styles = StyleSheet.create({
   base: {
     fontSize: 16,
-  },
-  lightText: {
-    color: '#000',
-  },
-  darkText: {
-    color: '#fff',
   },
 });
 

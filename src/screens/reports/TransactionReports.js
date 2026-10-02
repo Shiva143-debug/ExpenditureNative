@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useContext, useMemo, useRef } from 'react';
-import { FlatList, TouchableOpacity, StyleSheet, View, Alert, Animated, Platform } from 'react-native';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { FlatList, TouchableOpacity, StyleSheet, View, Alert, Animated } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedTextInput from '../../components/ThemedTextInput';
@@ -7,13 +7,12 @@ import ThemedText from '../../components/ThemedText';
 import { getFilteredExpenses } from '../../services/apiService';
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
 import Share from 'react-native-share';
-import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import LoaderSpinner from '../../components/LoaderSpinner';
 import ThemedView from '../../components/ThemedView';
-import { useAuth } from '../../context/AuthContext';
-import { ThemeContext } from '../../context/ThemeContext';
+import { useTheme } from '../../theme/useTheme';
+import { getReportsPalette } from '../../theme/palettes';
 
 const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -54,13 +53,13 @@ const TransactionCard = ({ item, index, palette }) => {
                                 {item.category || 'Uncategorized'}
                             </ThemedText>
                         </View>
-                        <ThemedText style={[styles.transactionDate, { color: '#ffffff' }]}>
-                            {new Date(item.p_date).toLocaleDateString('en-GB').replace(/\//g, '-')}
+                        <ThemedText style={[styles.transactionDate, { color: palette.textPrimary }]}>
+                            {new Date(item.pDate).toLocaleDateString('en-GB').replace(/\//g, '-')}
                         </ThemedText>
                     </View>
                     <View style={styles.productCostRow}>
                         <ThemedText style={[styles.transactionProduct, { color: palette.textPrimary }]} numberOfLines={1}>
-                            {item.expense_name}
+                            {item.expenseName}
                         </ThemedText>
                         <ThemedText style={[styles.transactionAmount, { color: palette.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
                             ₹{(parseFloat(item.cost) || 0).toLocaleString('en-IN')}
@@ -68,11 +67,11 @@ const TransactionCard = ({ item, index, palette }) => {
                     </View>
                 </View>
                 <View style={[styles.transactionBody, { borderColor: palette.cardBorder }]}>
-                    {parseFloat(item.tax_amount) > 0 && (
+                    {parseFloat(item.taxAmount) > 0 && (
                         <View style={styles.transactionDetailRow}>
                             <Icon name="receipt-long" size={16} color={palette.textSecondary} style={styles.transactionDetailIcon} />
                             <ThemedText style={[styles.transactionDetailText, { color: palette.textSecondary }]}>
-                                Tax ₹{(parseFloat(item.tax_amount) || 0).toLocaleString('en-IN')}
+                                Tax ₹{(parseFloat(item.taxAmount) || 0).toLocaleString('en-IN')}
                             </ThemedText>
                         </View>
                     )}
@@ -90,9 +89,20 @@ const TransactionCard = ({ item, index, palette }) => {
     );
 };
 
+// Declared at module scope: an inline arrow passed as `ListEmptyComponent`
+// would be a new component type on every render of the screen.
+const EmptyResults = ({ palette }) => (
+    <View style={styles.emptyState}>
+        <Icon name="receipt-long" size={48} color={palette.emptyIcon} />
+        <ThemedText style={[styles.emptyTitle, { color: palette.textPrimary }]}>No expenses found</ThemedText>
+        <ThemedText style={[styles.emptySubtitle, { color: palette.textSecondary }]}>
+            Adjust your filters or try a different period to see results.
+        </ThemedText>
+    </View>
+);
+
 const TransactionReports = () => {
-    const { id } = useAuth();
-    const { theme } = useContext(ThemeContext);
+    const { theme } = useTheme();
     const [expenceData, setExpenceData] = useState([]);
     const [searchText, setSearchText] = useState('');
     const [debouncedSearchText, setDebouncedSearchText] = useState('');
@@ -117,66 +127,7 @@ const TransactionReports = () => {
     const [Month, setMonth] = useState(currentMonth);
     const [Year, setYear] = useState(currentYear);
 
-    const palette = useMemo(() => theme === 'dark'
-        ? {
-            background: '#0f172a',
-            headerGradient: ['#0f172a', '#1e293b'],
-            headerAccent: '#38bdf8',
-            searchBackground: 'rgba(148, 163, 184, 0.16)',
-            searchBorder: 'rgba(148, 163, 184, 0.28)',
-            searchPlaceholder: '#94a3b8',
-            iconColor: '#38bdf8',
-            summaryGradients: [
-                ['#f97316', '#fb7185'],
-                ['#22d3ee', '#0284c7'],
-                ['#34d399', '#059669'],
-                ['#a855f7', '#6366f1'],
-            ],
-            summaryText: '#f8fafc',
-            cardGradients: [
-                ['#1f2937', '#111827'],
-                ['#1e293b', '#0f172a'],
-                ['#1d4ed8', '#1e293b'],
-                ['#0f172a', '#0b1120'],
-            ],
-            cardBorder: 'rgba(148, 163, 184, 0.16)',
-            textPrimary: '#e2e8f0',
-            textSecondary: '#94a3b8',
-            chipBackground: 'rgba(56, 189, 248, 0.12)',
-            chipText: '#bae6fd',
-            downloadGradient: ['#38bdf8', '#0ea5e9'],
-            emptyIcon: '#38bdf8',
-        }
-        : {
-            background: '#f5f7fb',
-            headerGradient: ['#2563eb', '#7c3aed'],
-            headerAccent: '#1d4ed8',
-            searchBackground: 'rgba(255, 255, 255, 0.95)',
-            searchBorder: 'rgba(59, 130, 246, 0.2)',
-            searchPlaceholder: '#64748b',
-            iconColor: '#2563eb',
-            summaryGradients: [
-                ['#f97316', '#fb923c'],
-                ['#0ea5e9', '#38bdf8'],
-                ['#22c55e', '#4ade80'],
-                ['#6366f1', '#8b5cf6'],
-            ],
-            summaryText: '#ffffff',
-            cardGradients: [
-                ['#ffffff', '#f8fafc'],
-                ['#fff7ed', '#ffedd5'],
-                ['#ecfeff', '#cffafe'],
-                ['#ede9fe', '#ddd6fe'],
-            ],
-            cardBorder: 'rgba(15, 23, 42, 0.08)',
-            textPrimary: '#0f172a',
-            textSecondary: '#475569',
-            chipBackground: 'rgba(99, 102, 241, 0.12)',
-            chipText: '#4338ca',
-            downloadGradient: ['#2563eb', '#7c3aed'],
-            emptyIcon: '#2563eb',
-        }
-    );
+    const palette = getReportsPalette(theme);
 
     // Reset showFilters when navigating away and coming back
     useFocusEffect(
@@ -186,9 +137,23 @@ const TransactionReports = () => {
         }, [])
     );
 
+    const fetchExpenseData = useCallback(async () => {
+        try {
+            setLoading(true);
+            const data = await getFilteredExpenses(Month, Year);
+            setExpenceData(data);
+            setShowFilters(false);
+        } catch (error) {
+            console.error('Error fetching expense data:', error);
+            Alert.alert('Error', 'Failed to load expense data');
+        } finally {
+            setLoading(false);
+        }
+    }, [Month, Year]);
+
     useEffect(() => {
         fetchExpenseData();
-    }, [id, Month, Year]);
+    }, [fetchExpenseData]);
 
     // Debounce search text
     useEffect(() => {
@@ -202,34 +167,6 @@ const TransactionReports = () => {
         }
     }, [searchText]);
 
-    const fetchExpenseData = async () => {
-        try {
-            setLoading(true);
-            const data = await getFilteredExpenses(id, Month, Year);
-            setExpenceData(data);
-            setShowFilters(false);
-        } catch (error) {
-            console.error('Error fetching expense data:', error);
-            Alert.alert('Error', 'Failed to load expense data');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const requestStoragePermission = async () => {
-        if (Platform.OS === 'android') {
-            try {
-                if (Platform.Version >= 33) return true;
-                const granted = await request(PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE);
-                return granted === RESULTS.GRANTED;
-            } catch (err) {
-                console.warn(err);
-                return false;
-            }
-        }
-        return true;
-    };
-
     const handleSearch = (text) => {
         setSearchText(text);
     };
@@ -239,12 +176,12 @@ const TransactionReports = () => {
         return expenceData.filter(item => {
             const matchesSearch = item?.category?.toLowerCase().includes(debouncedSearchText.toLowerCase()) ||
                 item?.description?.toLowerCase().includes(debouncedSearchText.toLowerCase()) ||
-                item?.expense_name?.toLowerCase().includes(debouncedSearchText.toLowerCase());
+                item?.expenseName?.toLowerCase().includes(debouncedSearchText.toLowerCase());
             return matchesSearch;
         });
     }, [debouncedSearchText, expenceData]);
 
-    const handleDownload = async () => {
+    const handleDownload = useCallback(async () => {
         try {
             setLoading(true);
 
@@ -252,7 +189,7 @@ const TransactionReports = () => {
             const sortedAssets = [...filteredData].sort(
                 (a, b) =>
                     (a.category || '').localeCompare(b.category || '') ||
-                    (a.expense_name || '').localeCompare(b.expense_name || '')
+                    (a.expenseName || '').localeCompare(b.expenseName || '')
             );
 
             const totalCost = sortedAssets.reduce(
@@ -260,7 +197,7 @@ const TransactionReports = () => {
                 0
             );
             const totalTaxAmount = sortedAssets.reduce(
-                (sum, item) => sum + (parseFloat(item.tax_amount) || 0),
+                (sum, item) => sum + (parseFloat(item.taxAmount) || 0),
                 0
             );
 
@@ -287,10 +224,10 @@ const TransactionReports = () => {
                 categories[category].forEach(item => {
                     tableContent += `
           <tr>
-            <td style="padding:8px;">${item.expense_name || 'N/A'}</td>
+            <td style="padding:8px;">${item.expenseName || 'N/A'}</td>
             <td style="padding:8px;">₹${Number(item.cost || 0).toLocaleString()}</td>
-            <td style="padding:8px;">₹${Number(item.tax_amount || 0).toLocaleString()}</td>
-            <td style="padding:8px;">${new Date(item.p_date).toLocaleDateString('en-GB').replace(/\//g, '-')}</td>
+            <td style="padding:8px;">₹${Number(item.taxAmount || 0).toLocaleString()}</td>
+            <td style="padding:8px;">${new Date(item.pDate).toLocaleDateString('en-GB').replace(/\//g, '-')}</td>
             <td style="padding:8px;">${item.description || '-------------------'}</td>
           </tr>
         `;
@@ -403,7 +340,7 @@ const TransactionReports = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filteredData, Month, Year]);
 
     const ListHeader = useMemo(() => (
         <ThemedView style={styles.headerContainer}>
@@ -440,7 +377,7 @@ const TransactionReports = () => {
                         <Icon name="search" size={18} color={palette.searchPlaceholder} style={styles.searchIcon} />
                         <ThemedTextInput
                             style={[styles.searchInput, { color: palette.textPrimary }]}
-                            placeholder="search category,expense name, or description"
+                            placeholder="search category,expense name, description"
                             placeholderTextColor={palette.searchPlaceholder}
                             value={searchText}
                             onChangeText={handleSearch}
@@ -502,7 +439,7 @@ const TransactionReports = () => {
                 </ThemedView>
             )}
         </ThemedView>
-    ), [showFilters, palette, searchText, Month, Year, filteredData, openMonth, openYear, months, years, theme]);
+    ), [showFilters, palette, searchText, Month, Year, filteredData, openMonth, openYear, months, years, theme, handleDownload]);
 
     return (
         <ThemedView style={[styles.container, { backgroundColor: palette.background }]}>
@@ -517,15 +454,7 @@ const TransactionReports = () => {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 ListFooterComponent={<View style={styles.listFooterSpacing} />}
-                ListEmptyComponent={() => (
-                    <View style={styles.emptyState}>
-                        <Icon name="receipt-long" size={48} color={palette.emptyIcon} />
-                        <ThemedText style={[styles.emptyTitle, { color: palette.textPrimary }]}>No expenses found</ThemedText>
-                        <ThemedText style={[styles.emptySubtitle, { color: palette.textSecondary }]}>
-                            Adjust your filters or try a different period to see results.
-                        </ThemedText>
-                    </View>
-                )}
+                ListEmptyComponent={<EmptyResults palette={palette} />}
                 renderItem={({ item, index }) => (
                     <TransactionCard item={item} index={index} palette={palette} />
                 )}
@@ -591,25 +520,9 @@ const styles = StyleSheet.create({
         marginBottom: 18,
         gap: 12,
     },
-    summaryCard: {
-        flex: 1,
-        borderRadius: 18,
-        padding: 18,
-    },
-    summaryCardContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    summaryLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 6,
-    },
-    summaryValue: {
-        fontSize: 24,
-        fontWeight: '700',
-    },
+    // summaryCard / summaryCardContent / summaryLabel / summaryValue are
+    // declared again further down this file; the later definitions win at
+    // runtime, so these earlier ones were dead.
     summaryActionButton: {
         width: 44,
         height: 44,
@@ -699,9 +612,6 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 18,
     },
-    summaryCardContent: {
-        flexDirection: 'column',
-    },
     summaryIconContainer: {
         width: 40,
         height: 40,
@@ -711,12 +621,9 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.18)',
         marginBottom: 14,
     },
-    summaryTextGroup: {
-    },
     summaryLabel: {
         fontSize: 13,
         fontWeight: '600',
-
     },
     summaryValue: {
         fontSize: 22,
@@ -849,7 +756,6 @@ const styles = StyleSheet.create({
     },
     transactionDate: {
         fontSize: 13,
-        color: 'inherit',
     },
     transactionDetailText: {
         fontSize: 13,

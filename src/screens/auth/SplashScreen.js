@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../../theme/useTheme';
 
 const SplashScreen = () => {
+  const { colors } = useTheme();
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -24,12 +26,13 @@ const SplashScreen = () => {
         duration: 800,
         useNativeDriver: true,
       }),
-    ]).start();
-  }, []);
+        ]).start();
+      }, [opacityAnim, scaleAnim, slideAnim]);
+
 
   return (
     <LinearGradient
-      colors={['#1976D2', '#42A5F5', '#1976D2']}
+      colors={[colors.primaryDark, colors.primary, colors.primaryDark]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.container}

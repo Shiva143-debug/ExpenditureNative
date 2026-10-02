@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Animated, Text } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Animated } from 'react-native';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from "@react-navigation/native";
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -8,33 +8,11 @@ import LoaderSpinner from '../../../components/LoaderSpinner';
 import ThemedView from '../../../components/ThemedView';
 import ThemedText from '../../../components/ThemedText';
 import ThemedTextInput from '../../../components/ThemedTextInput';
-import { ThemeContext } from '../../../context/ThemeContext';
+import { useTheme } from '../../../theme/useTheme';
+import { getExpenseCategoryIcon } from '../../../theme/entityIcons';
 import { getExpenseCosts } from '../../../services/apiService';
 
-const expensePalette = {
-  light: {
-    header:['#c95151ff', '#ee1515ff'],
-    accent: '#eb1818ff',
-    accentSoft: '#df1a55ff',
-    surface: 'white',
-    cardShadow: '#e0d9d955',
-    iconGlow: 'rgba(226, 19, 30, 0.35)',
-    emptyIcon: '#475569',
-    cardGradient: ['#e73c4bff', '#900e0eff'],
-    cardAccent: '#e2e8f0',
-  },
-  dark: {
-    header: ['#0f172a', '#ee1515ff'],
-    accent: '#eb1818ff',
-    accentSoft: '#df1a55ff',
-    surface: '#531421ff',
-    cardShadow: '#e0d9d955',
-    iconGlow: 'rgba(226, 19, 30, 0.35)',
-    emptyIcon: '#475569',
-    cardGradient: ['#0f172a', '#e71b25ff'],
-    cardAccent: '#e2e8f0',
-  },
-}
+const HEADER_GRADIENT = ['#fb7185', '#e11d48', '#9f1239'];
 
 const AnimatedExpenseCard = ({ item, index, getIconForCategory, onPress, palette }) => {
   const translateY = useRef(new Animated.Value(30)).current;
@@ -55,45 +33,49 @@ const AnimatedExpenseCard = ({ item, index, getIconForCategory, onPress, palette
         useNativeDriver: true,
       }),
     ]).start();
-  }, [index]);
+      }, [index, opacityAnim, translateY]);
 
 
+  const tax = parseFloat(item.taxAmount) || 0;
 
   return (
-    <Animated.View style={[{ transform: [{ translateY }], opacity: opacityAnim }]}>    
-          <LinearGradient colors={palette.cardGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.cardWrapper, { shadowColor: palette.cardShadow }]}> 
-            <TouchableOpacity activeOpacity={0.82} onPress={onPress}>
-              <View style={styles.cardContent}>
-                <View style={styles.leftSection}>
-                  <View style={[styles.iconBadge, { backgroundColor: `${palette.cardAccent}22` }]}>
-                    <Icon name={getIconForCategory(item.category)} size={32} color={palette.cardAccent} />
-                  </View>
-                  <View style={styles.savingDetails}>
-                    <ThemedText style={[styles.categoryLabel]}>{item.category}</ThemedText>
-                  </View>
-                </View>
-                <View style={styles.rightSection}>
-                  <ThemedText style={[styles.amountValue, { color: palette.cardAccent }]}>
-                    ₹{parseFloat(item.cost).toLocaleString('en-IN')}
-                  </ThemedText>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </LinearGradient>
-        </Animated.View>
+    <Animated.View style={[{ transform: [{ translateY }], opacity: opacityAnim }]}>
+      <View style={[styles.cardWrapper, { backgroundColor: palette.cardBackground, borderColor: palette.cardBorder, shadowColor: palette.cardShadow }]}>
+        <TouchableOpacity activeOpacity={0.82} onPress={onPress} style={styles.cardContent}>
+          <View style={styles.leftSection}>
+            <View style={[styles.iconBadge, { backgroundColor: palette.iconBackground(0.18) }]}>
+              <Icon name={getIconForCategory(item.category)} size={26} color={palette.accent} />
+            </View>
+            <View style={styles.categoryDetails}>
+              <ThemedText style={[styles.categoryLabel, { color: palette.textPrimary }]}>{item.category}</ThemedText>
+              {tax > 0 && (
+                <ThemedText style={[styles.taxValue, { color: palette.textSecondary }]}>
+                  Incl. tax ₹{tax.toLocaleString('en-IN')}
+                </ThemedText>
+              )}
+            </View>
+          </View>
+          <View style={styles.rightSection}>
+            <ThemedText style={[styles.amountValue, { color: palette.textPrimary }]}>
+              ₹{parseFloat(item.cost).toLocaleString('en-IN')}
+            </ThemedText>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
   );
 };
 
 const ExpensesList = () => {
   const route = useRoute();
-  const { id, Month, Year } = route.params;
+  const { Month, Year } = route.params;
   const [expensesData, setExpensesData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [filteredExpensesData, setFilteredExpensesData] = useState([]);
   const navigation = useNavigation();
-  const { theme } = useContext(ThemeContext);
-  const palette = theme === 'dark' ? expensePalette.dark : expensePalette.light;
+  const { palette: themePalettes } = useTheme();
+  const palette = themePalettes.list.expense;
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -101,168 +83,11 @@ const ExpensesList = () => {
   ];
 
   // Category to icon mapping
-  const categoryIcons = {
-    // Mobile & Recharge related
-    'Recharge': 'smartphone',
-    'Mobile Recharge': 'smartphone',
-    'Phone Recharge': 'phone-android',
-    'Data Recharge': 'signal-cellular-alt',
-    'DTH': 'tv',
-    
-    // Cutting & Salon related
-    'Cutting': 'content-cut',
-    'Hair Cut': 'content-cut',
-    'Salon': 'content-cut',
-    'Haircut': 'content-cut',
-    'Barber': 'content-cut',
-    
-    // Vehicle related
-    'Vehicle': 'two-wheeler',
-    'Bike': 'two-wheeler',
-    'Motorcycle': 'two-wheeler',
-    'Scooter': 'two-wheeler',
-    'Bicycle': 'pedal-bike',
-    'Car Service': 'directions-car',
-    'Vehicle Service': 'build',
-    'Vehicle Repair': 'build',
-    'Petrol': 'local-gas-station',
-    'Diesel': 'local-gas-station',
-    
-    // Food and Groceries
-    'Food': 'restaurant',
-    'food': 'restaurant',
-    'Food and Dining': 'restaurant',
-    'Restaurant': 'restaurant-menu',
-    'Groceries': 'local-grocery-store',
-    'grocery': 'local-grocery-store',
-    
-    // Transportation
-    'Transportation': 'directions-car',
-    'transport': 'directions-car',
-    'Car': 'directions-car',
-    'Fuel': 'local-gas-station',
-    'Bus': 'directions-bus',
-    'Train': 'train',
-    'Taxi': 'local-taxi',
-    
-    // Shopping
-    'Shopping': 'shopping-cart',
-    'Clothing': 'checkroom',
-    'Fashion': 'checkroom',
-    'Electronics': 'devices',
-    'Accessories': 'watch',
-    
-    // Entertainment
-    'Entertainment': 'movie',
-    'Movies': 'movie',
-    'Games': 'sports-esports',
-    'Sports': 'sports-basketball',
-    'Music': 'music-note',
-    
-    // Healthcare
-    'Healthcare': 'local-hospital',
-    'Medical': 'medical-services',
-    'Medicine': 'medication',
-    'Doctor': 'healing',
-    'Health': 'favorite',
-    
-    // Education
-    'Education': 'school',
-    'Books': 'menu-book',
-    'Tuition': 'cast-for-education',
-    'Courses': 'class',
-    'Training': 'psychology',
-    
-    // Bills and Utilities
-    'Bills': 'receipt',
-    'Utilities': 'power',
-    'Electricity': 'bolt',
-    'Water': 'water-drop',
-    'Internet': 'wifi',
-    'Phone': 'phone',
-    'Mobile': 'smartphone',
-    
-    // Housing
-    'Housing': 'home',
-    'Rent': 'house',
-    'Maintenance': 'build',
-    'Furniture': 'chair',
-    'Appliances': 'kitchen',
-    
-    // Travel
-    'Travel': 'flight',
-    'Hotel': 'hotel',
-    'Vacation': 'beach-access',
-    'Tourism': 'tour',
-    
-    // Financial
-    'Insurance': 'security',
-    'Investment': 'trending-up',
-    'Savings': 'savings',
-    'Banking': 'account-balance',
-    
-    // Personal Care
-    'Personal Care': 'face',
-    'Fitness': 'fitness-center',
-    'Beauty': 'spa',
-    
-    // Gifts and Donations
-    'Gifts': 'card-giftcard',
-    'Donations': 'volunteer-activism',
-    'Charity': 'favorite-border',
-    
-    // Business
-    'Business': 'business-center',
-    'Office': 'business',
-    'Stationery': 'edit',
-    
-    // Pets
-    'Pets': 'pets',
-    'Pet Food': 'pets',
-    'Veterinary': 'healing',
-    
-    // Default icon for unknown categories
-    'default': 'payments'
-  };
-
-  const getIconForCategory = (category) => {
-    if (!category) return categoryIcons.default;
-    
-    // Convert category to lowercase for case-insensitive matching
-    const normalizedCategory = category.toLowerCase();
-    
-    // First try exact match
-    if (categoryIcons[category]) {
-      return categoryIcons[category];
-    }
-    
-    // Then try case-insensitive match
-    const exactMatch = Object.keys(categoryIcons).find(
-      key => key.toLowerCase() === normalizedCategory
-    );
-    if (exactMatch) {
-      return categoryIcons[exactMatch];
-    }
-    
-    // Try to find partial matches
-    const partialMatch = Object.keys(categoryIcons).find(
-      key => normalizedCategory.includes(key.toLowerCase()) || 
-             key.toLowerCase().includes(normalizedCategory)
-    );
-    if (partialMatch) {
-      return categoryIcons[partialMatch];
-    }
-    
-    // Return default icon if no match found
-    return categoryIcons.default;
-  };
-
   const getExpenses = async () => {
-    if (!id) return;
     try {
       setLoading(true);
-      const data = await getExpenseCosts(id);
-      setExpensesData(data);
+      const response = await getExpenseCosts();
+      setExpensesData(response?.data || []);
     } catch (error) {
       console.error('Error fetching expenses:', error);
       setExpensesData([]);
@@ -274,7 +99,7 @@ const ExpensesList = () => {
   useFocusEffect(
     React.useCallback(() => {
       getExpenses();
-    }, [id])
+    }, [])
   );
 
   const monthlyExpenses = useMemo(() =>
@@ -301,45 +126,45 @@ const ExpensesList = () => {
     filteredExpenses.reduce((acc, curr) => {
       const category = curr.category || 'Uncategorized';
       const cost = parseFloat(curr.cost) || 0;
-      const taxAmount = parseFloat(curr.tax_amount) || 0;
+      const taxAmount = parseFloat(curr.taxAmount) || 0;
       if (!acc[category]) {
         acc[category] = {
           ...curr,
           category,
           cost,
-          tax_amount: taxAmount,
+          taxAmount: taxAmount,
         };
       } else {
         acc[category].cost += cost;
-        acc[category].tax_amount = (acc[category].tax_amount || 0) + taxAmount;
+        acc[category].taxAmount = (acc[category].taxAmount || 0) + taxAmount;
       }
       return acc;
     }, {})
   );
 
   const totalExpenses = aggregatedExpenses.reduce((acc, curr) => acc + (curr.cost || 0), 0);
-  const isDark = theme === 'dark';
 
   const handleExpenseClick = (item) => {
     navigation.navigate("ItemReport", { category: item.category, Month, Year });
   };
 
-
-
   const renderHeader = () => (
-    <LinearGradient colors={palette.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+    <LinearGradient colors={HEADER_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+      <Icon name="receipt-long" size={130} color="rgba(255,255,255,0.08)" style={styles.headerDecor} />
       <View style={styles.headerTopRow}>
-        <View>
-          <ThemedText style={[styles.headerTitle, { color: palette.cardAccent }]}>Expense Details</ThemedText>
-          <ThemedText style={[styles.headerSubtitle, { color: palette.cardAccent }]}>{monthNames[parseInt(Month) - 1]} {Year}</ThemedText>
+        <View style={styles.headerTextWrap}>
+          <View style={styles.monthPill}>
+            <Icon name="calendar-month" size={14} color="#fff" />
+            <ThemedText style={styles.monthPillText}>{monthNames[parseInt(Month, 10) - 1]} {Year}</ThemedText>
+          </View>
         </View>
-        <Icon name="trending-down" size={40} color={palette.cardAccent} />
+        <View style={styles.headerAvatar}>
+          <Icon name="trending-down" size={24} color="#fff" />
+        </View>
       </View>
-      <View style={[styles.totalCard] }>
-        <View>
-          <ThemedText style={[styles.totalLabel, { color: palette.cardAccent }]}>Total Expenses</ThemedText>
-          <ThemedText style={[styles.totalAmount, { color: palette.cardAccent }]}>₹{totalExpenses.toLocaleString('en-IN')}</ThemedText>
-        </View>
+      <View style={[styles.totalCard, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+        <ThemedText style={styles.totalLabel}>Total Expenses</ThemedText>
+        <ThemedText style={styles.totalAmount}>₹{totalExpenses.toLocaleString('en-IN')}</ThemedText>
       </View>
     </LinearGradient>
   );
@@ -348,41 +173,44 @@ const ExpensesList = () => {
     <AnimatedExpenseCard
       item={item}
       index={index}
-      getIconForCategory={getIconForCategory}
+      getIconForCategory={getExpenseCategoryIcon}
       onPress={() => handleExpenseClick(item)}
       palette={palette}
     />
   );
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: palette.surface }]}>
-      <LoaderSpinner shouldLoad={loading} />
-      <View style={styles.headerSection}>
-        {renderHeader()}
-      </View>
-      <View style={styles.searchSection}>
-        <ThemedTextInput
-          value={searchText}
-          onChangeText={setSearchText}
-          placeholder="Search category Name,amount..."
-          style={styles.searchInput}
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={palette.background} style={StyleSheet.absoluteFillObject} />
+      <ThemedView style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <LoaderSpinner shouldLoad={loading} />
+        <View style={styles.headerSection}>
+          {renderHeader()}
+        </View>
+        <View style={styles.searchSection}>
+          <ThemedTextInput
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Search category Name,amount..."
+            style={[styles.searchInput, { borderColor: palette.cardBorder, backgroundColor: palette.cardBackground, color: palette.textPrimary }]}
+          />
+        </View>
+        <FlatList
+          data={aggregatedExpenses}
+          keyExtractor={(item, index) => item.category?.toString() || index.toString()}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Icon name="trending-down" size={48} color={palette.emptyIcon} />
+              <ThemedText style={[styles.emptyText, { color: palette.textSecondary }]}>No expenses found</ThemedText>
+            </View>
+          }
         />
-      </View>
-      <FlatList 
-        data={aggregatedExpenses}
-        keyExtractor={(item, index) => item.category?.toString() || index.toString()}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={true}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Icon name="trending-down" size={48} color={isDark ? '#666' : '#ccc'} />
-            <ThemedText style={styles.emptyText}>No expenses found</ThemedText>
-          </View>
-        }
-      />
-    </ThemedView>
+      </ThemedView>
+    </View>
   );
 };
 
@@ -391,81 +219,100 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    zIndex: 1,
-    paddingHorizontal: 6,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: 10,
   },
   headerGradient: {
-    borderRadius: 20,
-    padding: 24,
-    elevation: 6,
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  headerDecor: {
+    position: 'absolute',
+    right: -20,
+    top: -20,
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    alignItems: 'center',
+  },
+  headerTextWrap: {
+    flex: 1,
+    marginRight: 12,
+  },
+  monthPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  monthPillText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 4,
+  },
+  headerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontWeight: '500',
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.3,
   },
   totalCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 14,
+    marginTop: 18,
+    borderRadius: 16,
     padding: 16,
-    backdropFilter: 'blur(10px)',
   },
   totalLabel: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
     marginBottom: 6,
   },
   totalAmount: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#fff',
   },
   listContainer: {
-    padding: 6,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 100,
   },
   cardWrapper: {
     marginBottom: 14,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  gradientCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  gradientTouchable: {
-    flex: 1,
-    borderRadius: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 16,
   },
   leftSection: {
@@ -474,8 +321,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconBadge: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
@@ -485,19 +332,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryLabel: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#fff',
-    marginBottom: 6,
   },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dateValue: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.75)',
+  taxValue: {
+    fontSize: 12.5,
     fontWeight: '500',
+    marginTop: 3,
   },
   rightSection: {
     marginLeft: 12,
@@ -506,37 +347,28 @@ const styles = StyleSheet.create({
   amountValue: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 6,
   },
-  taxValue: {
-    fontSize: 12,
-    marginBottom: 6,
-    fontWeight: '500',
-  },
-
   searchSection: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: 'black',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: 'transparent',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 70,
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '500',
     marginTop: 12,
-    opacity: 0.6,
   },
 });
 

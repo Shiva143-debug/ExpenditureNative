@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { addSaving } from '../../services/apiService';
 import ThemedText from '../../components/ThemedText';
 import ThemedTextInput from '../../components/ThemedTextInput';
-import { ScrollView } from 'react-native-gesture-handler';
 import LoaderSpinner from '../../components/LoaderSpinner';
-import { useAuth } from '../../context/AuthContext';
 import ThemedTextAreaInput from '../../components/ThemedTextAreaInput';
+import { inputStyles as formStyles } from '../../styles';
 
 
 const Saving = ({ palette }) => {
-  const { id } = useAuth();
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState('');
   const [note, setNote] = useState('');
@@ -55,9 +53,13 @@ const Saving = ({ palette }) => {
     }
     try {
       setIsAddingSaving(true);
-      await addSaving({ id, amount, date, note });
-      Toast.show({ type: 'success', text1: 'Success', text2: 'Saving added successfully', position: 'top', visibilityTime: 3000, autoHide: true });
-      handleClear();
+      const response = await addSaving({ amount, date, note });
+      if (response?.status) {
+        Toast.show({ type: 'success', text1: 'Success', text2: response.message || 'Saving added successfully', position: 'top', visibilityTime: 3000, autoHide: true });
+        handleClear();
+      } else {
+        Toast.show({ type: 'error', text1: 'Error', text2: response?.message || 'Failed to add saving', position: 'top' });
+      }
     } catch (error) {
       Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to add saving', position: 'top' });
     } finally {
@@ -69,47 +71,53 @@ const Saving = ({ palette }) => {
     <>
       <LoaderSpinner shouldLoad={isAddingSaving} />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <ThemedText style={[styles.label, { color: palette.savingText }]}>Amount (₹) :</ThemedText>
-      <ThemedTextInput
-        style={[styles.input, { borderColor: palette.savingBorder }]}
-        placeholder="Enter amount"
-        keyboardType="numeric"
-        value={amount}
-        onChangeText={setAmount}
-      />
-      <ThemedText style={[styles.label, { color: palette.savingText }]}>Date :</ThemedText>
-      <TouchableOpacity
-        onPress={() => setShowDatePicker(true)}
-        style={[styles.dateButton, { borderColor: palette.savingBorder }]}
-      >
-        <ThemedText style={[styles.dateButtonText, { color: date ? palette.savingText : palette.tabInactiveText }]}>
-          {date || 'Select Date'}
-        </ThemedText>
-      </TouchableOpacity>
-      {showDatePicker && (
-        <DateTimePicker
-          value={date ? new Date(date) : new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
+      <View style={formStyles.fieldGroup}>
+        <ThemedText style={[formStyles.label, { color: palette.savingText }]}>Amount (₹) :</ThemedText>
+        <ThemedTextInput
+          style={[formStyles.input, { borderColor: palette.savingBorder }]}
+          placeholder="Enter amount"
+          keyboardType="numeric"
+          value={amount}
+          onChangeText={setAmount}
         />
-      )}
-      <ThemedText style={[styles.label, { color: palette.savingText }]}>Note (Optional) :</ThemedText>
-      <ThemedTextAreaInput
-        style={[styles.textArea, { borderColor: palette.savingBorder }]}
-        placeholder="Add a note about this saving"
-        value={note}
-        onChangeText={setNote}
-      />
+      </View>
+      <View style={formStyles.fieldGroup}>
+        <ThemedText style={[formStyles.label, { color: palette.savingText }]}>Date :</ThemedText>
+        <TouchableOpacity
+          onPress={() => setShowDatePicker(true)}
+          style={[formStyles.dateButton, { borderColor: palette.savingBorder }]}
+        >
+          <ThemedText style={[formStyles.dateButtonText, { color: date ? palette.savingText : palette.tabInactiveText }]}>
+            {date || 'Select Date'}
+          </ThemedText>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={date ? new Date(date) : new Date()}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+          />
+        )}
+      </View>
+      <View style={formStyles.fieldGroup}>
+        <ThemedText style={[formStyles.label, { color: palette.savingText }]}>Note (Optional) :</ThemedText>
+        <ThemedTextAreaInput
+          style={[formStyles.textArea, { borderColor: palette.savingBorder }]}
+          placeholder="Add a note about this saving"
+          value={note}
+          onChangeText={setNote}
+        />
+      </View>
       <View style={styles.buttons}>
         <TouchableOpacity style={styles.button} onPress={handleClear} activeOpacity={0.85}>
-          <LinearGradient colors={palette.savingClearGradient} style={styles.buttonGradient}>
+          <LinearGradient colors={palette.savingClearGradient} style={formStyles.buttonGradient}>
             <ThemedText style={styles.buttonText}>Clear</ThemedText>
           </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.85}>
-          <LinearGradient colors={palette.savingButtonGradient} style={styles.buttonGradient}>
-            <ThemedText style={styles.buttonTextPrimary}>Add</ThemedText>
+          <LinearGradient colors={palette.savingButtonGradient} style={formStyles.buttonGradient}>
+            <ThemedText style={styles.buttonTextPrimary}>Submit</ThemedText>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -121,45 +129,8 @@ const Saving = ({ palette }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  
-  },
    scrollContainer: {
     flexGrow: 1,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-    marginTop: 10,
-  },
-  input: {
-    marginBottom: 40,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  dateButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderRadius: 14,
-    marginTop: 10,
-    marginBottom: 40,
-  },
-  dateButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  textArea: {
-    minHeight: 100,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
   },
   buttons: {
     flexDirection: 'row',
@@ -169,20 +140,13 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-  },
-  buttonGradient: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 14,
   },
   buttonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#ffffff',
   },
   buttonTextPrimary: {
     fontSize: 15,

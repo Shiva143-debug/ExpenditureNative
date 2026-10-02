@@ -1,38 +1,36 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedText from '../../components/ThemedText';
 import ThemedView from '../../components/ThemedView';
-import { ThemeContext } from '../../context/ThemeContext';
+import { useTheme } from '../../theme/useTheme';
 import Expense from './Expense';
 import Source from './Source';
 import Saving from './Saving';
 
 const Add = () => {
   const [selectedTab, setSelectedTab] = useState('expence');
-  const { theme } = useContext(ThemeContext);
+  const { theme } = useTheme();
 
   const palette = useMemo(() => theme === 'dark'
     ? {
-      background: 'black',
+      background: '#0f172a',
       headerGradient: ['#1d4ed8', '#7c3aed'],
       headerTitle: '#f8fafc',
       headerSubtitle: 'rgba(226, 232, 240, 0.78)',
       tabContainerBackground: 'rgba(15, 23, 42, 0.92)',
       tabContainerBorder: 'rgba(148, 163, 184, 0.32)',
       tabInactive: 'rgba(148, 163, 184, 0.14)',
-      tabInactiveText: '#cbd5f5',
-      tabInactiveIcon: '#cbd5f5',
+      tabInactiveText: '#94a3b8',
+      tabInactiveIcon: '#94a3b8',
       expenseGradient: ['#ef4444', '#dc2626'],
       incomeGradient: ['#22c55e', '#16a34a'],
       savingGradient: ['#0ea5e9', '#14b8a6'],
-      savingButtonGradient: ['#14b8a6', '#0d9488'],
+      savingButtonGradient: ['#4CAF50', '#2E7D32'],
       savingClearGradient: ['#64748b', '#475569'],
-      savingBorder: 'rgba(148, 163, 184, 0.32)',
+      savingBorder: '#475569',
       savingText: '#e2e8f0',
-      cardBackground: 'black',
-      cardBorder: 'rgba(148, 163, 184, 0.16)',
     }
     : {
       background: '#f5f7fb',
@@ -42,17 +40,15 @@ const Add = () => {
       tabContainerBackground: '#ffffff',
       tabContainerBorder: 'rgba(37, 99, 235, 0.16)',
       tabInactive: 'rgba(37, 99, 235, 0.1)',
-      tabInactiveText: '#2563eb',
-      tabInactiveIcon: '#2563eb',
+      tabInactiveText: '#64748b',
+      tabInactiveIcon: '#64748b',
       expenseGradient: ['#fb7185', '#f97316'],
       incomeGradient: ['#34d399', '#16a34a'],
       savingGradient: ['#14b8a6', '#0ea5e9'],
-      savingButtonGradient: ['#14b8a6', '#0d9488'],
-      savingClearGradient: ['#cbd5f5', '#94a3b8'],
-      savingBorder: 'rgba(37, 99, 235, 0.18)',
+      savingButtonGradient: ['#4CAF50', '#2E7D32'],
+      savingClearGradient: ['#64748b', '#475569'],
+      savingBorder: '#cbd5e1',
       savingText: '#0f172a',
-      cardBackground: '#ffffff',
-      cardBorder: 'rgba(15, 23, 42, 0.08)',
     }, [theme]);
 
   const tabs = useMemo(() => [
@@ -93,7 +89,7 @@ const Add = () => {
             );
           })}
         </View>
-        <View style={[styles.contentCard, styles.contentShadow, { backgroundColor: palette.cardBackground, borderColor: palette.cardBorder }]}>
+        <View style={styles.content}>
           {selectedTab === 'expence' && <Expense palette={palette}/>}
           {selectedTab === 'income' && <Source palette={palette}/>}
           {selectedTab === 'saving' && <Saving palette={palette} />}
@@ -126,7 +122,7 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     marginTop: -60,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
   },
   tabSwitcher: {
     flexDirection: 'row',
@@ -165,19 +161,9 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: '#ffffff',
   },
-  contentCard: {
+  content: {
     flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 10,
-    overflow: 'hidden',
-  },
-  contentShadow: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    elevation: 12,
+    paddingBottom: 20,
   },
 });
 

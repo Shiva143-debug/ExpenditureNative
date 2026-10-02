@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Animated, Text, Alert } from 'react-native';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -7,46 +7,17 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getIncomeByMonthYear, updateIncome } from "../../services/apiService";
-import DropDownPicker from 'react-native-dropdown-picker';
 import LoaderSpinner from '../../components/LoaderSpinner';
 import ThemedView from '../../components/ThemedView';
-import { ThemeContext } from '../../context/ThemeContext';
+import { useTheme } from '../../theme/useTheme';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import { getIncomeSources, deleteIncome } from '../../services/apiService';
+import {LIST_HEADER_GRADIENTS} from '../../theme/palettes';
+import {formatDateKey, toDateKey} from '../../utils/format';
+import FormDropdown from '../../components/FormDropdown';
+import {cancelBackground} from '../../theme/colors';
 
-
-const colorProfiles = {
-  light: {
-    background: ['#dcfce7', '#bbf7d0'],
-    accent: '#15803d',
-    accentSoft: '#4a7c59',
-    cardShadow: '#00000022',
-    iconBackground: alpha => `rgba(21, 128, 61, ${alpha})`,
-    listBackground: '#f1fff6',
-    emptyIcon: '#9ca3af',
-    cardAccent: '#0f172a',
-    cardBorder: 'rgba(15, 23, 42, 0.08)',
-    textPrimary: '#0f172a',
-    textSecondary: '#475569',
-    pickerBackground: '#f5f7fb',
-  },
-  dark: {
-    background: ['#0f3a2d', '#0b1f16'],
-    accent: '#34d399',
-    accentSoft: '#5eead4',
-    cardShadow: '#00000044',
-    iconBackground: alpha => `rgba(52, 211, 153, ${alpha})`,
-    listBackground: '#0b1913',
-    emptyIcon: '#4b5563',
-    cardAccent: '#e2e8f0',
-    cardBorder: 'rgba(148, 163, 184, 0.16)',
-    textPrimary: '#e2e8f0',
-    textSecondary: '#94a3b8',
-    pickerBackground: '#0f172a',
-  },
-};
-
-const buildGradientPair = (colors) => [colors[0], colors[1]];
+const HEADER_GRADIENT = LIST_HEADER_GRADIENTS.income;
 
 const AnimatedIncomeCard = ({ item, index, accentPalette, onDelete, onEdit }) => {
   const translateY = useRef(new Animated.Value(30)).current;
@@ -69,7 +40,8 @@ const AnimatedIncomeCard = ({ item, index, accentPalette, onDelete, onEdit }) =>
         useNativeDriver: true,
       }),
     ]).start();
-  }, [index]);
+      }, [index, opacityAnim, translateY]);
+
 
   const handleDeletePress = () => {
     Animated.sequence([
@@ -101,49 +73,40 @@ const AnimatedIncomeCard = ({ item, index, accentPalette, onDelete, onEdit }) =>
     ]).start(() => onEdit?.(item));
   };
 
-  const getSourceConfig = (source) => {
-    return { gradient: ['#456e62ff', '#0b1f16'], icon: 'attach-money', textColor: 'white' };
-  };
-
-  const config = getSourceConfig(item.source);
-  const palette = accentPalette;
+  const formattedDate = formatDateKey(item.date);
 
   return (
     <Animated.View style={[{ transform: [{ translateY }], opacity: opacityAnim }]}>
-      <View style={[styles.cardWrapper, { shadowColor: palette.cardShadow }]}>
-        <LinearGradient colors={config.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientCard}>
-          <TouchableOpacity activeOpacity={0.82} onPress={() => onEdit?.(item)} style={styles.gradientTouchable}>
-            <View style={styles.cardContent}>
-              <View style={styles.leftSection}>
-                <View style={[styles.iconBadge, { backgroundColor: palette.iconBackground(0.18) }]}>
-                  <Icon name={config.icon} size={32} color={config.textColor} />
-                </View>
-                <View style={styles.sourceDetails}>
-                  <ThemedText style={[styles.sourceLabel, { color: config.textColor }]}>{item.source}</ThemedText>
-                  <View style={styles.dateRow}>
-                    <Icon name="event" size={13} color="white" />
-                    <Text style={[styles.dateValue, { color: 'white' }]}>{new Date(item.date).toLocaleDateString('en-GB').replace(/\//g, '-')}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.rightSection}>
-                <ThemedText style={[styles.amountValue, { color: config.textColor }]}>₹{parseFloat(item.amount).toLocaleString('en-IN')}</ThemedText>
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
-                    <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
-                      <Icon name="edit-note" size={18} color={config.textColor} />
-                    </Animated.View>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
-                    <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
-                      <Icon name="delete-outline" size={18} color="#dc2626" />
-                    </Animated.View>
-                  </TouchableOpacity>
-                </View>
+      <View style={[styles.cardWrapper, { backgroundColor: accentPalette.cardBackground, borderColor: accentPalette.cardBorder, shadowColor: accentPalette.cardShadow }]}>
+        <TouchableOpacity activeOpacity={0.82} onPress={() => onEdit?.(item)} style={styles.cardContent}>
+          <View style={styles.leftSection}>
+            <View style={[styles.iconBadge, { backgroundColor: accentPalette.iconBackground(0.18) }]}>
+              <Icon name="account-balance-wallet" size={26} color={accentPalette.accent} />
+            </View>
+            <View style={styles.sourceDetails}>
+              <ThemedText style={[styles.sourceLabel, { color: accentPalette.textPrimary }]}>{item.sourceName}</ThemedText>
+              <View style={styles.dateRow}>
+                <Icon name="event" size={13} color={accentPalette.textSecondary} />
+                <ThemedText style={[styles.dateValue, { color: accentPalette.textSecondary }]}>{formattedDate}</ThemedText>
               </View>
             </View>
-          </TouchableOpacity>
-        </LinearGradient>
+          </View>
+          <View style={styles.rightSection}>
+            <ThemedText style={[styles.amountValue, { color: accentPalette.textPrimary }]}>₹{parseFloat(item.amount).toLocaleString('en-IN')}</ThemedText>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
+                <Animated.View style={[{ transform: [{ scale: editScaleAnim }] }]}>
+                  <Icon name="edit-note" size={18} color={accentPalette.accent} />
+                </Animated.View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
+                <Animated.View style={[{ transform: [{ scale: deleteScaleAnim }] }]}>
+                  <Icon name="delete-outline" size={18} color="#dc2626" />
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
@@ -151,12 +114,12 @@ const AnimatedIncomeCard = ({ item, index, accentPalette, onDelete, onEdit }) =>
 
 const IncomeList = () => {
   const route = useRoute();
-  const { id, Month, Year } = route.params;
+  const { Month, Year } = route.params;
   const [incomeData, setIncomeData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [filteredIncomeData, setFilteredIncomeData] = useState([]);
-  const { theme } = useContext(ThemeContext);
+  const { palette, isDark } = useTheme();
 
   const [editVisible, setEditVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -165,19 +128,19 @@ const IncomeList = () => {
   const [sourceValue, setSourceValue] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [sourceData, setSourceData] = useState([]);
-  const [refreshFlag, setRefreshFlag] = useState(false);
-
-  const [editSource, setEditSource] = useState('');
+  // Re-fetch trigger for the list effect. Nothing toggles it today — the
+  // setter was left over from an earlier manual-refresh button.
+  const [refreshFlag] = useState(false);
   const [editAmount, setEditAmount] = useState('');
   const [editDate, setEditDate] = useState(new Date());
 
-
-  const accentPalette = theme === 'dark' ? colorProfiles.dark : colorProfiles.light;
+  const accentPalette = palette.list.income;
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
+
   useEffect(() => {
     if (!editVisible) {
       setSourceOpen(false);
@@ -185,14 +148,15 @@ const IncomeList = () => {
   }, [editVisible]);
 
 
-  const getMonthlyIncome = async () => {
+  const getMonthlyIncome = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getIncomeByMonthYear(id, Month, Year);
-      if (Array.isArray(data)) {
-        setIncomeData(data);
+      const response = await getIncomeByMonthYear(Month, Year);
+      if (response?.status) {
+        setIncomeData(Array.isArray(response.data) ? response.data : []);
       } else {
         setIncomeData([]);
+        Alert.alert('Error', response?.message || 'Failed to fetch income data');
       }
     } catch (error) {
       console.error('Error fetching income data:', error);
@@ -200,14 +164,14 @@ const IncomeList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [Month, Year]);
 
   useFocusEffect(
     React.useCallback(() => {
-      if (id && Month && Year) {
+      if (Month && Year) {
         getMonthlyIncome();
       }
-    }, [Month, Year, id])
+    }, [Month, Year, getMonthlyIncome])
   );
 
   // Filter income data based on search text
@@ -217,29 +181,31 @@ const IncomeList = () => {
     } else {
       const lowerSearch = searchText.toLowerCase();
       setFilteredIncomeData(incomeData.filter(item =>
-        (item.source || '').toLowerCase().includes(lowerSearch) ||
+        (item.sourceName || '').toLowerCase().includes(lowerSearch) ||
         (item.amount || '').toString().includes(lowerSearch)
       ));
     }
   }, [incomeData, searchText]);
 
   const totalAmount = filteredIncomeData.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
-  const isDark = theme === 'dark';
 
   const renderHeader = () => (
-    <LinearGradient colors={accentPalette.background} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+    <LinearGradient colors={HEADER_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerGradient}>
+      <Icon name="account-balance-wallet" size={130} color="rgba(255,255,255,0.08)" style={styles.headerDecor} />
       <View style={styles.headerTopRow}>
-        <View>
-          <ThemedText style={[styles.headerTitle, { color: accentPalette.accent }]}>Income Sources</ThemedText>
-          <ThemedText style={[styles.headerSubtitle, { color: accentPalette.accentSoft }]}>{monthNames[parseInt(Month) - 1]} {Year}</ThemedText>
+        <View style={styles.headerTextWrap}>
+          <View style={styles.monthPill}>
+            <Icon name="calendar-month" size={14} color="#fff" />
+            <ThemedText style={styles.monthPillText}>{monthNames[parseInt(Month, 10) - 1]} {Year}</ThemedText>
+          </View>
         </View>
-        <Icon name="trending-up" size={40} color={accentPalette.accent} />
+        <View style={styles.headerAvatar}>
+          <Icon name="trending-up" size={24} color="#fff" />
+        </View>
       </View>
-      <View style={[styles.totalCard, { backgroundColor: accentPalette.iconBackground(0.18) }]}>
-        <View>
-          <ThemedText style={[styles.totalLabel, { color: accentPalette.accentSoft }]}>Total Income</ThemedText>
-          <ThemedText style={[styles.totalAmount, { color: accentPalette.accent }]}>₹{totalAmount.toLocaleString('en-IN')}</ThemedText>
-        </View>
+      <View style={[styles.totalCard, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+        <ThemedText style={styles.totalLabel}>Total Income</ThemedText>
+        <ThemedText style={styles.totalAmount}>₹{totalAmount.toLocaleString('en-IN')}</ThemedText>
       </View>
     </LinearGradient>
   );
@@ -258,10 +224,13 @@ const IncomeList = () => {
           onPress: async () => {
             try {
               setLoading(true);
-              await deleteIncome(item.id, id);
-              // Refresh the income data after deletion
-              await getMonthlyIncome();
-              Alert.alert("Success", "Income source deleted successfully");
+              const response = await deleteIncome(item.id);
+              if (response?.status) {
+                await getMonthlyIncome();
+                Alert.alert("Success", response.message || "Income source deleted successfully");
+              } else {
+                Alert.alert("Error", response?.message || "Failed to delete income source");
+              }
             } catch (error) {
               console.error("Error deleting income source:", error);
               Alert.alert("Error", "Failed to delete income source");
@@ -279,8 +248,7 @@ const IncomeList = () => {
   const handleEditIncome = (item) => {
     setSelectedItem(item);
 
-    setEditSource(item.source);
-    setSourceValue(item.source); // ✅ preselect dropdown
+    setSourceValue(item.sourceId);
 
     setEditAmount(item.amount.toString());
     setEditDate(new Date(item.date));
@@ -298,16 +266,19 @@ const IncomeList = () => {
     try {
       setLoading(true);
 
-      await updateIncome(selectedItem.id, id, {
-        source: sourceValue, // ✅ dropdown value
+      const response = await updateIncome(selectedItem.id, {
+        sourceId: sourceValue,
         amount: editAmount,
-        date: editDate.toISOString().split('T')[0],
+        date: toDateKey(editDate),
       });
 
-      setEditVisible(false);
-      await getMonthlyIncome();
-
-      Alert.alert("Success", "Income source updated successfully");
+      if (response?.status) {
+        setEditVisible(false);
+        await getMonthlyIncome();
+        Alert.alert("Success", response.message || "Income source updated successfully");
+      } else {
+        Alert.alert("Error", response?.message || "Failed to update income source");
+      }
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Failed to update income source");
@@ -318,29 +289,31 @@ const IncomeList = () => {
 
 
   useEffect(() => {
-    if (!id) return;
-
     const fetchSources = async () => {
       try {
-        const data = await getIncomeSources(id);
-        console.log(data);
-        if (data) {
-          const transformedData = data.map(item => ({
-            label: item.source_name,
-            value: item.source_name,
-            key: item.id.toString()
-          }));
-          setSourceData(transformedData);
+        const response = await getIncomeSources();
+        if (response?.status) {
+          const data = response.data;
+          if (data) {
+            const transformedData = data.map(item => ({
+              label: item.sourceName,
+              value: item.id,
+              key: item.id.toString()
+            }));
+            setSourceData(transformedData);
+          }
+        } else {
+          Alert.alert('Error', response?.message || 'Failed to fetch sources');
         }
 
       } catch (error) {
         console.error('Error fetching sources:', error);
-        Toast.show({ type: "error", text1: "Error", text2: "Failed to fetch sources", position: "top" });
+        Alert.alert('Error', 'Failed to fetch sources');
       }
     };
 
     fetchSources();
-  }, [id, refreshFlag]);
+  }, [refreshFlag]);
 
   const renderItem = ({ item, index }) => (
     <AnimatedIncomeCard
@@ -353,33 +326,35 @@ const IncomeList = () => {
   );
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: accentPalette.listBackground }]}>
-      <LoaderSpinner shouldLoad={loading} />
-      <View style={styles.headerSection}>
-        {renderHeader()}
-      </View>
-      <View style={styles.searchSection}>
-        <ThemedTextInput
-          value={searchText}
-          onChangeText={setSearchText}
-          placeholder="Search source Name,amount..."
-          style={styles.searchInput}
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={accentPalette.background} style={StyleSheet.absoluteFillObject} />
+      <ThemedView style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <LoaderSpinner shouldLoad={loading} />
+        <View style={styles.headerSection}>
+          {renderHeader()}
+        </View>
+        <View style={styles.searchSection}>
+          <ThemedTextInput
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Search source Name,amount..."
+            style={[styles.searchInput, { borderColor: accentPalette.cardBorder, backgroundColor: accentPalette.cardBackground, color: accentPalette.textPrimary }]}
+          />
+        </View>
+        <FlatList
+          data={filteredIncomeData}
+          keyExtractor={(item, index) => item.id?.toString() || item.source + index}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Icon name="trending-up" size={48} color={accentPalette.emptyIcon} />
+              <ThemedText style={[styles.emptyText, { color: accentPalette.textSecondary }]}>No Income Sources Found</ThemedText>
+            </View>
+          }
         />
-      </View>
-      <FlatList
-        data={filteredIncomeData}
-        keyExtractor={(item, index) => item.source + index}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={true}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Icon name="trending-up" size={48} color={isDark ? '#666' : '#ccc'} />
-            <ThemedText style={styles.emptyText}>No Income Sources Found</ThemedText>
-          </View>
-        }
-      />
 
       <Modal
         transparent
@@ -390,36 +365,27 @@ const IncomeList = () => {
         <View style={styles.modalOverlay}>
           <View style={[
             styles.modalContent,
-            { backgroundColor: isDark ? '#111' : '#fff' }
+            { backgroundColor: accentPalette.dialogBackground }
           ]}>
 
             <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Edit Income Source</ThemedText>
+              <ThemedText style={[styles.modalTitle, { color: accentPalette.textPrimary }]}>Edit Income Source</ThemedText>
               <TouchableOpacity onPress={() => setEditVisible(false)}>
-                <Icon name="close" size={24} />
+                <Icon name="close" size={24} color={accentPalette.textPrimary} />
               </TouchableOpacity>
             </View>
 
-            <ThemedText style={styles.inputLabel}>Source Name</ThemedText>
+            <ThemedText style={[styles.inputLabel, { color: accentPalette.textPrimary }]}>Source Name</ThemedText>
 
-            <DropDownPicker
-              open={sourceOpen}
-              value={sourceValue}
-              items={sourceData}
-              setOpen={setSourceOpen}
-              setValue={setSourceValue}
-              setItems={setSourceData}
+            <FormDropdown
+              open={sourceOpen} onOpenChange={setSourceOpen}
+              value={sourceValue} onChange={setSourceValue}
+              items={sourceData} setItems={setSourceData}
               placeholder="Select Source"
-              listMode="SCROLLVIEW"
-              style={[styles.picker, { borderColor: accentPalette.cardBorder, backgroundColor: accentPalette.pickerBackground }]}
-              dropDownContainerStyle={[styles.dropdownList, { borderColor: accentPalette.cardBorder, backgroundColor: accentPalette.pickerBackground }]}
-              textStyle={[styles.dropdownText, { color: accentPalette.textPrimary }]}
-              zIndex={3000}
-              zIndexInverse={1000}
-              theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+              palette={accentPalette} variant="dialog"
             />
 
-      
+
             {showDatePicker && (
               <DateTimePicker
                 value={editDate}
@@ -435,35 +401,35 @@ const IncomeList = () => {
             )}
 
 
-            <ThemedText style={styles.inputLabel}>Amount</ThemedText>
+            <ThemedText style={[styles.inputLabel, { color: accentPalette.textPrimary }]}>Amount</ThemedText>
             <ThemedTextInput
               value={editAmount}
               onChangeText={setEditAmount}
               keyboardType="numeric"
-              style={styles.input}
+              style={[styles.input, { borderColor: accentPalette.cardBorder, backgroundColor: accentPalette.pickerBackground, color: accentPalette.textPrimary }]}
             />
 
-            <ThemedText style={styles.inputLabel}>Date</ThemedText>
-              <TouchableOpacity
-              style={styles.dateButton}
+            <ThemedText style={[styles.inputLabel, { color: accentPalette.textPrimary }]}>Date</ThemedText>
+            <TouchableOpacity
+              style={[styles.dateButton, { borderColor: accentPalette.cardBorder }]}
               onPress={() => setShowDatePicker(true)}
             >
-              <Text style={styles.dateButtonText}>
-                {editDate.toDateString()}
+              <Text style={[styles.dateButtonText, { color: accentPalette.textPrimary }]}>
+                {formatDateKey(editDate)}
               </Text>
             </TouchableOpacity>
 
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={[styles.button, styles.cancelButton, { backgroundColor: cancelBackground(isDark) }]}
                 onPress={() => setEditVisible(false)}
               >
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={[styles.buttonText, { color: accentPalette.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.button, styles.addButton]}
+                style={[styles.button, styles.addButton, { backgroundColor: accentPalette.accent }]}
                 onPress={handleUpdateIncome}
               >
                 <Text style={styles.addButtonText}>Update</Text>
@@ -473,7 +439,8 @@ const IncomeList = () => {
         </View>
       </Modal>
 
-    </ThemedView>
+      </ThemedView>
+    </View>
   );
 };
 
@@ -482,95 +449,112 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    zIndex: 1,
-    paddingHorizontal: 6,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: 10,
   },
   searchSection: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
-
+    paddingBottom: 10,
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: 'black',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: 'transparent',
   },
   headerGradient: {
-    borderRadius: 20,
-    padding: 24,
-    elevation: 6,
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  headerDecor: {
+    position: 'absolute',
+    right: -20,
+    top: -20,
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    alignItems: 'center',
+  },
+  headerTextWrap: {
+    flex: 1,
+    marginRight: 12,
+  },
+  monthPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  monthPillText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 4,
+  },
+  headerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontWeight: '500',
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.3,
   },
   totalCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 14,
+    marginTop: 18,
+    borderRadius: 16,
     padding: 16,
-    backdropFilter: 'blur(10px)',
   },
   totalLabel: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
     marginBottom: 6,
   },
   totalAmount: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#fff',
   },
   listContainer: {
-    padding: 6,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 100,
   },
   cardWrapper: {
     marginBottom: 14,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  gradientCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-  },
-  gradientTouchable: {
-    flex: 1,
-    borderRadius: 16,
   },
   leftSection: {
     flexDirection: 'row',
@@ -578,8 +562,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconBadge: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
@@ -589,9 +573,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sourceLabel: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 6,
   },
   dateRow: {
@@ -601,7 +584,6 @@ const styles = StyleSheet.create({
   },
   dateValue: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.75)',
     fontWeight: '500',
   },
   rightSection: {
@@ -609,7 +591,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   amountValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -627,31 +609,30 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 70,
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '500',
     marginTop: 12,
-    opacity: 0.6,
   },
   // Modal styles
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(2, 6, 23, 0.6)',
     padding: 20,
   },
   modalContent: {
     width: '100%',
-    borderRadius: 15,
-    padding: 20,
-    elevation: 5,
+    borderRadius: 20,
+    padding: 22,
+    elevation: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -664,9 +645,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   inputLabel: {
-    fontSize: 16,
-    marginBottom: 5,
-    marginTop: 10,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginTop: 12,
   },
   picker: {
     borderWidth: 1,
@@ -684,9 +666,12 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '100%',
-  },
-  textArea: {
-    width: '100%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 6,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -694,42 +679,36 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   button: {
-    padding: 12,
-    borderRadius: 8,
-    minWidth: '45%',
-    alignItems: 'center',
+    padding: 13,
+    borderRadius: 12,
+    flex: 1,
   },
   cancelButton: {
-    backgroundColor: '#ccc',
+    marginRight: 10,
+    alignItems: 'center',
   },
   addButton: {
-    backgroundColor: '#0e4f5f',
+    marginLeft: 10,
+    alignItems: 'center',
   },
   buttonText: {
     fontSize: 16,
-    color: '#333',
+    fontWeight: '600',
   },
   addButtonText: {
     fontSize: 16,
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-    dateButton: {
+  dateButton: {
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ccc',
-    marginBottom: 40,
+    marginBottom: 10,
   },
   dateButtonText: {
     fontSize: 16,
     textAlign: 'center',
-    color: 'white',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
   },
 });
 

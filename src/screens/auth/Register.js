@@ -1,14 +1,34 @@
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, Button, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { ActivityIndicator, TextInput } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import ThemedText from '../../components/ThemedText';
 import ThemedView from '../../components/ThemedView';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../../theme/useTheme';
 import { registerUser } from '../../services/apiService';
 
 
 const Register = ({ navigation }) => {
+  const { colors, isDark, toggleTheme } = useTheme();
+
+  const inputTheme = isDark
+    ? {
+        colors: {
+          primary: '#38bdf8',
+          text: '#ffffff',
+          placeholder: '#9ca3af',
+          surface: 'transparent',
+          background: 'transparent',
+          onSurface: '#ffffff',
+          onSurfaceVariant: '#9ca3af',
+          outline: '#555555',
+          disabled: '#555555',
+        },
+      }
+    : undefined;
+
   const [formData, setFormData] = useState({ fullName: '', email: '', mobileNo: '', address: '' });
   const [formErrors, setFormErrors] = useState({});
   const [touchedFields, setTouchedFields] = useState({});
@@ -19,7 +39,7 @@ const Register = ({ navigation }) => {
     validateForm();
   };
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const errors = {};
     if (!formData.fullName) errors.fullName = 'Full name is required';
     if (!formData.email) {
@@ -32,30 +52,41 @@ const Register = ({ navigation }) => {
     } else if (formData.mobileNo.length !== 10) {
       errors.mobileNo = 'Mobile number must be 10 digits';
     }
-    if (!formData.address) errors.address = 'Address is required';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
-  };
+  }, [formData]);
   const handleFormSubmit = async () => {
-    if (!validateForm()) return;
+    const isValid = validateForm();
+    setTouchedFields({fullName: true, email: true, mobileNo: true, address: true});
+    if (!isValid) return;
 
     const values = {
-      full_name: formData.fullName,
+      fullName: formData.fullName,
       email: formData.email,
-      mobile_no: formData.mobileNo,
+      mobileNo: formData.mobileNo,
       address: formData.address,
     };
 
     try {
       setLoading(true);
 
-      const data = await registerUser(values);
+      const response = await registerUser(values);
+
+      if (!response.status) {
+        Toast.show({
+          type: 'error',
+          position: 'top',
+          text1: 'Error',
+          text2: response.message || 'Something went wrong',
+        });
+        return;
+      }
 
       Toast.show({
         type: 'success',
         position: 'top',
         text1: 'Success',
-        text2: data.message, // ✅ backend success message
+        text2: response.message || 'Registration successful',
       });
 
       setFormData({ fullName: '', email: '', mobileNo: '', address: '' });
@@ -68,10 +99,7 @@ const Register = ({ navigation }) => {
         type: 'error',
         position: 'top',
         text1: 'Error',
-        text2:
-          error?.response?.data?.message ||   // ✅ backend error
-          error.message ||
-          'Something went wrong',
+        text2: error?.message || 'Something went wrong',
       });
     } finally {
       setLoading(false);
@@ -85,28 +113,31 @@ const Register = ({ navigation }) => {
 
   useEffect(() => {
     validateForm();
-  }, [formData]);
+  }, [validateForm]);
 
   return (
     <ThemedView style={styles.container}>
+      <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
+        <Icon name={isDark ? 'light-mode' : 'dark-mode'} size={26} color={colors.textPrimary} />
+      </TouchableOpacity>
       <Image source={{ uri: 'https://res.cloudinary.com/dxgbxchqm/image/upload/v1735649616/register_qziayq.jpg' }} style={styles.logo} />
-      <Text style={styles.heading}>Register!!</Text>
+      <Text style={[styles.heading, { color: colors.textPrimary }]}>Register!!</Text>
       <View style={styles.formSection}>
         <View style={styles.inputContainer}>
-          <TextInput mode="outlined" label="Full Name" style={styles.input} disabled={loading} value={formData.fullName} placeholder="Enter Full Name" onChangeText={(text) => setFormData({ ...formData, fullName: text })} onBlur={() => handleBlur('fullName')} />
+          <TextInput mode="outlined" label="Full Name" style={styles.input} theme={inputTheme} editable={!loading} value={formData.fullName} placeholder="Enter Full Name" onChangeText={(text) => setFormData({ ...formData, fullName: text })} onBlur={() => handleBlur('fullName')} />
           {touchedFields.fullName && formErrors.fullName && (<Text style={styles.errorText}>{formErrors.fullName}</Text>)}
 
-          <TextInput mode="outlined" label="Email" style={styles.input} disabled={loading} value={formData.email} onChangeText={(text) => setFormData({ ...formData, email: text })} onBlur={() => handleBlur('email')} placeholder="Enter your email" keyboardType="email-address" />
+          <TextInput mode="outlined" label="Email" style={styles.input} theme={inputTheme} editable={!loading} value={formData.email} onChangeText={(text) => setFormData({ ...formData, email: text })} onBlur={() => handleBlur('email')} placeholder="Enter your email" keyboardType="email-address" />
           {touchedFields.email && formErrors.email && (<Text style={styles.errorText}>{formErrors.email}</Text>)}
 
-          <TextInput mode="outlined" label="Mobile Number" style={styles.input} disabled={loading} value={formData.mobileNo} onChangeText={(text) => setFormData({ ...formData, mobileNo: text })} onBlur={() => handleBlur('mobileNo')} placeholder="Enter Mobile Number" keyboardType="phone-pad" />
+          <TextInput mode="outlined" label="Mobile Number" style={styles.input} theme={inputTheme} editable={!loading} value={formData.mobileNo} onChangeText={(text) => setFormData({ ...formData, mobileNo: text })} onBlur={() => handleBlur('mobileNo')} placeholder="Enter Mobile Number" keyboardType="phone-pad" />
           {touchedFields.mobileNo && formErrors.mobileNo && (<Text style={styles.errorText}>{formErrors.mobileNo}</Text>)}
 
-          <TextInput mode="outlined" label="Address" style={styles.input} disabled={loading} value={formData.address} onChangeText={(text) => setFormData({ ...formData, address: text })} onBlur={() => handleBlur('address')} placeholder="Enter Address" />
+          <TextInput mode="outlined" label="Address" style={styles.input} theme={inputTheme} editable={!loading} value={formData.address} onChangeText={(text) => setFormData({ ...formData, address: text })} onBlur={() => handleBlur('address')} placeholder="Enter Address" />
           {touchedFields.address && formErrors.address && (<Text style={styles.errorText}>{formErrors.address}</Text>)}
 
           <TouchableOpacity
-            style={[styles.registerButton, loading && styles.disabledButton]}
+            style={[styles.registerButton, { backgroundColor: colors.primary }, loading && styles.disabledButton]}
             onPress={handleFormSubmit}
             disabled={loading}
           >
@@ -122,7 +153,7 @@ const Register = ({ navigation }) => {
           {!loading &&
             <ThemedText style={styles.BottomText}> Already have an account?{' '}
               <Text onPress={signInClick}>
-                <Text style={styles.signInText}>Sign In</Text>
+                <Text style={[styles.signInText, { color: colors.primary }]}>Sign In</Text>
               </Text>
             </ThemedText>
           }
@@ -138,19 +169,27 @@ const styles = StyleSheet.create({
     // backgroundColor: '#fff',
   },
   formSection: {
-    marginTop: 5,
+    // marginTop: 5,
     alignItems: 'center',
-    padding: 20,
+    paddingLeft: 15,
+    paddingRight: 15,
   },
   heading: {
     fontSize: 24,
     fontWeight: 'bold',
     paddingLeft: 20,
     paddingTop: 10,
-    color: 'purple',
+  },
+  themeToggle: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
   },
   signInText: {
-    color: 'blue',
     paddingTop: 10
   },
   inputContainer: {
@@ -173,7 +212,6 @@ const styles = StyleSheet.create({
     paddingTop: 10
   },
   registerButton: {
-    backgroundColor: '#6200EE',
     paddingVertical: 12,
     borderRadius: 6,
     alignItems: 'center',

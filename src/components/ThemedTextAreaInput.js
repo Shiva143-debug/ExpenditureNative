@@ -1,21 +1,24 @@
 // components/ThemedTextAreaInput.js
-import React, { useContext } from 'react';
+import React from 'react';
 import { TextInput, StyleSheet } from 'react-native';
-import { ThemeContext } from '../context/ThemeContext';
+import { useTheme } from '../theme/useTheme';
 
 const ThemedTextAreaInput = ({ style, ...props }) => {
-  const { theme } = useContext(ThemeContext);
-  const isDark = theme === 'dark';
+  const { colors } = useTheme();
 
   return (
     <TextInput
       multiline
       numberOfLines={4}
       textAlignVertical="top"
-      placeholderTextColor={isDark ? '#ccc' : '#666'}
+      placeholderTextColor={colors.inputPlaceholder}
       style={[
         styles.base,
-        isDark ? styles.darkInput : styles.lightInput,
+        {
+          backgroundColor: colors.inputBackground,
+          color: colors.textPrimary,
+          borderColor: colors.inputBorder,
+        },
         style,
       ]}
       {...props}
@@ -31,16 +34,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginVertical: 8,
     minHeight: 100,
-  },
-  lightInput: {
-    backgroundColor: '#fff',
-    color: '#000',
-    borderColor: '#ccc',
-  },
-  darkInput: {
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
-    borderColor: '#555',
   },
 });
 

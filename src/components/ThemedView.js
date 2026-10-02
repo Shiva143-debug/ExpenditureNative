@@ -1,19 +1,13 @@
 // components/ThemedView.js
-import React, { useContext } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { ThemeContext } from '../context/ThemeContext';
+import { useTheme } from '../theme/useTheme';
 
 const ThemedView = ({ children, style }) => {
-  const { theme } = useContext(ThemeContext);
+  const { colors } = useTheme();
 
   return (
-    <View
-      style={[
-        styles.base,
-        theme === 'dark' ? styles.dark : styles.light,
-        style,
-      ]}
-    >
+    <View style={[styles.base, { backgroundColor: colors.background }, style]}>
       {children}
     </View>
   );
@@ -22,12 +16,6 @@ const ThemedView = ({ children, style }) => {
 const styles = StyleSheet.create({
   base: {
     flex: 1,
-  },
-  dark: {
-    backgroundColor: '#000',
-  },
-  light: {
-    backgroundColor: '#fff',
   },
 });
 

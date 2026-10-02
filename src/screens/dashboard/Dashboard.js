@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated, Alert } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -9,8 +9,9 @@ import LoaderSpinner from '../../components/LoaderSpinner';
 import ThemedView from '../../components/ThemedView';
 import SplashScreen from '../auth/SplashScreen';
 import { useAuth } from '../../context/AuthContext';
-import { ThemeContext } from '../../context/ThemeContext';
-import { getExpenseCosts , getIncomeByMonthYear, getSavingsDataByMonthYear} from '../../services/apiService';
+import { useTheme } from '../../theme/useTheme';
+import { getDashboardPalette } from '../../theme/palettes';
+import { getStats } from '../../services/apiService';
 
 const withAlpha = (hex, alpha) => {
   if (!hex || typeof hex !== 'string') { return hex; }
@@ -23,13 +24,6 @@ const withAlpha = (hex, alpha) => {
     .padStart(2, '0');
   return `${normalized}${alphaHex}`;
 };
-
-const baseSummaryGradients = [
-  ['#f97316', '#fb7185'],
-  ['#22d3ee', '#0284c7'],
-  ['#34d399', '#059669'],
-  ['#a855f7', '#6366f1'],
-];
 
 const AnimatedStatCard = ({ gradient, bgGradient, icon, label, value, onPress, delay, labelColor = '#ffffff', valueColor = '#ffffff', iconGlow = 'rgba(255, 255, 255, 0.28)' }) => {
   const translateY = useRef(new Animated.Value(30)).current;
@@ -74,7 +68,8 @@ const AnimatedStatCard = ({ gradient, bgGradient, icon, label, value, onPress, d
         ).start();
       }
     });
-  }, [delay, scaleAnim]);
+      }, [delay, scaleAnim, opacityAnim, translateY]);
+
 
   return (
     <Animated.View
@@ -105,12 +100,28 @@ const AnimatedStatCard = ({ gradient, bgGradient, icon, label, value, onPress, d
   );
 };
 
+const EMPTY_STATS = {
+  income: 0,
+  expenses: 0,
+  savings: 0,
+  tax: 0,
+  count: 0,
+  uniqueCategories: 0,
+};
+
+// Postgres numeric columns arrive as strings, so coerce defensively.
+const toNumber = (value) => {
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const Dashboard = () => {
-  const { id, setInitialDataLoaded, initialDataLoaded } = useAuth();
-  const { theme } = useContext(ThemeContext);
+  const { setInitialDataLoaded, initialDataLoaded, getDisplayName } = useAuth();
+  const displayName = getDisplayName() || 'there';
+  const { theme } = useTheme();
   const initialLoadDone = useRef(false);
   const [openMonth, setOpenMonth] = useState(false);
-  const [Month, setSelectedMonth] = useState((new Date().getMonth() +1 ).toString());
+  const [Month, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
   const [showDropdowns, setShowDropdowns] = useState(false);
   const [loading, setLoading] = useState(false);
   const [months, setMonths] = useState([
@@ -138,113 +149,73 @@ const Dashboard = () => {
     { label: '2028', value: '2028' },
   ]);
 
-  const [expenseData, setExpenseData] = useState([]);
-  const [incomeData, setIncomeData] = useState([]);
-  const [savings, setSavings] = useState([]);
-  const [taxAmount, setTaxAmount] = useState(0);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [loadError, setLoadError] = useState('');
   const navigation = useNavigation();
 
-  // Function to fetch expense data
-  const getExpenses = async () => {
+  // Single aggregated request for the whole dashboard summary
+  const getDashboardStats = async (month, year) => {
     try {
-      const data = await getExpenseCosts(id);
-      return data;
+      const response = await getStats(month, year);
+      if (!response?.status || !response?.data) {
+        setStats(EMPTY_STATS);
+        setLoadError(response?.message || 'Failed to load dashboard data');
+        return;
+      }
+      const data = response.data;
+      setStats({
+        income: toNumber(data.incomeAmount),
+        expenses: toNumber(data.expenseAmount),
+        savings: toNumber(data.savingsAmount),
+        tax: toNumber(data.taxAmount),
+        count: toNumber(data.expenseCount),
+        uniqueCategories: toNumber(data.categoryCount),
+      });
+      setLoadError('');
     } catch (error) {
-      console.error('Error fetching expenses:', error);
-      return [];
+      console.error('Error fetching dashboard stats:', error);
+      setStats(EMPTY_STATS);
+      setLoadError('Failed to load dashboard data');
     }
   };
 
-  // Function to fetch income data
-  const getIncome = async () => {
-    try {
-      const data = await getIncomeByMonthYear(id, Month, Year);
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.error('Error fetching income:', error);
-      return [];
-    }
-  };
-
-  // Function to calculate tax amount
-  const calculateTaxAmount = (expenses) => {
-    return expenses.reduce((acc, curr) => {
-      const taxAmount = parseFloat(curr.tax_amount) || 0;
-      return acc + taxAmount;
-    }, 0);
-  };
-
-  // Replace the existing useEffect with useFocusEffect
   useFocusEffect(
     React.useCallback(() => {
+      let cancelled = false;
+
       const loadDashboardData = async () => {
         setLoading(true);
         try {
-          // Fetch all data in parallel
-          const [expenseResult, incomeResult] = await Promise.all([
-            getExpenses(),
-            getIncome(),
-            fetchSavingsData(),
-            setShowDropdowns(false),
-          ]);
+          await getDashboardStats(Month, Year);
+          if (!cancelled) { setShowDropdowns(false); }
 
-          // Store all expense data
-          setExpenseData(expenseResult);
-
-          // Filter expenses for current month and year
-          const filteredExpenses = expenseResult.filter(
-            (expense) => expense.month.toString() === Month &&
-              expense.year.toString() === Year
-          );
-
-          // Update states
-          setIncomeData(incomeResult);
-          setTaxAmount(calculateTaxAmount(filteredExpenses));
-
-          // Mark initial load as done
           if (!initialLoadDone.current) {
             initialLoadDone.current = true;
             setInitialDataLoaded(true);
           }
-
         } catch (error) {
           console.error('Error loading dashboard data:', error);
-          // Mark initial load as done even on error to allow user to see the dashboard
           if (!initialLoadDone.current) {
             initialLoadDone.current = true;
             setInitialDataLoaded(true);
           }
         } finally {
-          setLoading(false);
+          if (!cancelled) { setLoading(false); }
         }
       };
 
       loadDashboardData();
-    }, [id, Month, Year, setInitialDataLoaded])
+
+      return () => { cancelled = true; };
+    }, [Month, Year, setInitialDataLoaded])
   );
 
-  // useEffect(()=>{
-  //     fetchSavingsData();
-  //     console.log("fetching savings data");
-  // },[id,Month, Year])
-
-  const fetchSavingsData = async () => {
-    setLoading(true);
-    const data = await getSavingsDataByMonthYear(id, Month, Year);
-    console.log('monthwisedata', data);
-    setSavings(data || []);
-    setLoading(false);
-  };
-  const filteredExpenses = useMemo(
-    () =>
-      expenseData.filter(
-        (expense) =>
-          expense?.month?.toString() === Month && expense?.year?.toString() === Year
-      ),
-    [expenseData, Month, Year]
-  );
-  const totalExpenses = filteredExpenses.reduce((acc, curr) => acc + (parseFloat(curr.cost) || 0), 0);
-  const totalIncome = incomeData.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+  const {
+    income: totalIncome,
+    expenses: totalExpenses,
+    savings: totalSavings,
+    tax: totalTax,
+  } = stats;
 
   const handleMonthSelect = (value) => {
     setSelectedMonth(value);
@@ -260,83 +231,61 @@ const Dashboard = () => {
     }
   };
 
-  const handlePressExpence = () => {
-    navigation.navigate('ExpensesList', { id, Month, Year });
-  };
+  const handlePressExpence = useCallback(() => {
+    navigation.navigate('ExpensesList', { Month, Year });
+  }, [navigation, Month, Year]);
 
-  const handlePressIncome = () => {
-    navigation.navigate('IncomeList', { id, Month, Year });
+  const handlePressIncome = useCallback(() => {
+    navigation.navigate('IncomeList', { Month, Year });
+  }, [navigation, Month, Year]);
+
+  const handlePressExpenceByCat = () => {
+    navigation.navigate('ExpenseByCategoryList');
   };
 
   const handlePressBalance = () => {
     navigation.navigate('BalanceList');
   };
 
-  const handlePressSavings = () => {
+  const handlePressSavings = useCallback(() => {
     navigation.navigate('SavingsList');
-  };
+  }, [navigation]);
 
   const handlePressCategories = () => {
-    navigation.navigate('CategoriesScreen', { id });
+    navigation.navigate('CategoriesScreen');
   };
 
   const handlePressProducts = () => {
-    navigation.navigate('ProductsScreen', { id });
+    navigation.navigate('ProductsScreen');
   };
 
   const handlePressSources = () => {
-    navigation.navigate('SourcesScreen', { id });
+    navigation.navigate('SourcesScreen');
   };
 
-  const handlePressTax = () => {
-    const expensesWithTax = expenseData.filter((item) => parseFloat(item.tax_amount) > 0);
-    if (expensesWithTax.length > 0) {
-      navigation.navigate('TaxAmountList', { expensesWithTax });
+  const handlePressTax = useCallback(() => {
+    if (totalTax <= 0) {
+      Alert.alert('No Tax Details', 'No tax has been recorded for the selected month and year.');
+      return;
     }
-  };
+    navigation.navigate('TaxAmountList', { Month, Year });
+  }, [totalTax, Month, Year, navigation]);
 
-  const handlePressExpenceByCat = () => {
-    navigation.navigate('ExpenseByCategoryList');
-  };
 
-  const totalSavings = savings.reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
+
   const balance = totalIncome - (totalExpenses + totalSavings);
 
   const isDark = theme === 'dark';
-  const palette = useMemo(
-    () =>
-      isDark
-        ? {
-          headerAccent: '#38bdf8',
-          searchBackground: 'rgba(148, 163, 184, 0.16)',
-          cardBorder: 'rgba(148, 163, 184, 0.16)',
-          textPrimary: '#e2e8f0',
-          textSecondary: '#94a3b8',
-          summaryGradients: baseSummaryGradients,
-          summaryText: '#f8fafc',
-          background: '#0f172a',
-        }
-        : {
-          headerAccent: '#1d4ed8',
-          searchBackground: 'rgba(255, 255, 255, 0.95)',
-          cardBorder: 'rgba(15, 23, 42, 0.08)',
-          textPrimary: '#0f172a',
-          textSecondary: '#475569',
-          summaryGradients: baseSummaryGradients,
-          summaryText: '#f8fafc',
-             background: '#f5f7fb',
-        },
-    [isDark]
-  );
+  const palette = getDashboardPalette(theme);
 
-  const summaryMetrics = useMemo(() => {
-    const totalCost = filteredExpenses.reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
-    const totalTax = filteredExpenses.reduce((sum, item) => sum + (parseFloat(item.tax_amount) || 0), 0);
-    const count = filteredExpenses.length;
-    const uniqueCategories = new Set(filteredExpenses.map((item) => item.category || 'Uncategorized')).size;
-    const average = count ? totalCost / count : 0;
-    return { totalCost, totalTax, count, uniqueCategories, average };
-  }, [filteredExpenses]);
+  const summaryMetrics = useMemo(
+    () => ({
+      totalTax,
+      count: stats.count,
+      uniqueCategories: stats.uniqueCategories,
+    }),
+    [totalTax, stats.count, stats.uniqueCategories]
+  );
 
   const summaryCards = useMemo(
     () => [
@@ -353,6 +302,7 @@ const Dashboard = () => {
         description: 'Including applied taxes',
         icon: 'receipt-long',
         gradient: palette.summaryGradients[3],
+        onPress: handlePressTax,
       },
       // {
       //   label: 'Categories',
@@ -363,7 +313,7 @@ const Dashboard = () => {
       // },
 
     ],
-    [summaryMetrics, palette]
+    [summaryMetrics, palette, balance, handlePressTax]
   );
 
   const statCardConfigs = useMemo(() => {
@@ -419,7 +369,7 @@ const Dashboard = () => {
       },
 
     ];
-  }, [isDark, palette.summaryGradients, palette.summaryText, totalIncome, totalExpenses, totalSavings, handlePressIncome, handlePressExpence, handlePressSavings, handlePressCategories, handlePressProducts, handlePressSources]);
+  }, [palette.summaryGradients, palette.summaryText, totalIncome, totalExpenses, totalSavings, handlePressIncome, handlePressExpence, handlePressSavings]);
 
   const summaryAnimations = useRef(summaryCards.map(() => new Animated.Value(0))).current;
 
@@ -439,7 +389,11 @@ const Dashboard = () => {
 
   const headerGradient = isDark
     ? ['#252525ff', '#67696bff']
-    : ['#667eea', '#764ba2'];
+    : ['#6366f1', '#8b5cf6'];
+
+  const backgroundGradient = isDark
+    ? ['#1a1a1a', '#1a1a1a']
+    : ['#eef2ff', '#f5f3ff', '#ecfeff'];
 
   const renderSummarySection = () => (
     <View style={styles.summaryGrid}>
@@ -465,27 +419,37 @@ const Dashboard = () => {
 
         return (
           <Animated.View key={card.label} style={[styles.summaryCardWrapper, animatedStyle]}>
-            <LinearGradient colors={card.gradient} style={styles.summaryCard}>
-              <View style={styles.summaryCardContent}>
-                <View style={{ display: 'flex', flexDirection: "row", }}>
-                  <View style={{ marginRight: 2 }}>
-                    <Icon name={card.icon} size={20} color={palette.summaryText} />
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={card.onPress}
+              disabled={!card.onPress}
+              style={styles.summaryCardTouchable}
+            >
+              <LinearGradient colors={card.gradient} style={styles.summaryCard}>
+                <View style={styles.summaryCardContent}>
+                  <View style={styles.summaryHeaderRow}>
+                    <View style={styles.summaryIconMargin}>
+                      <Icon name={card.icon} size={20} color={palette.summaryText} />
+                    </View>
+                    <ThemedText style={[styles.summaryLabel, { color: palette.summaryText }]}>
+                      {card.label}
+                    </ThemedText>
+                    {card.onPress ? (
+                      <Icon name="chevron-right" size={20} color={palette.summaryText} style={styles.summaryChevron} />
+                    ) : null}
                   </View>
-                  <ThemedText style={[styles.summaryLabel, { color: palette.summaryText }]}>
-                    {card.label}
-                  </ThemedText>
-                </View>
-                <View style={styles.summaryTextGroup}>
+                  <View style={styles.summaryTextGroup}>
 
-                  <ThemedText style={[styles.summaryValue, { color: palette.summaryText }]}>
-                    {card.value}
-                  </ThemedText>
-                  <ThemedText style={[styles.summaryDescription, { color: palette.summaryText }]}>
-                    {card.description}
-                  </ThemedText>
+                    <ThemedText style={[styles.summaryValue, { color: palette.summaryText }]}>
+                      {card.value}
+                    </ThemedText>
+                    <ThemedText style={[styles.summaryDescription, { color: palette.summaryText }]}>
+                      {card.description}
+                    </ThemedText>
+                  </View>
                 </View>
-              </View>
-            </LinearGradient>
+              </LinearGradient>
+            </TouchableOpacity>
           </Animated.View>
         );
       })}
@@ -514,129 +478,145 @@ const Dashboard = () => {
   );
 
   return (
-    <ThemedView style={styles.mainContainer}>
-      {!initialDataLoaded && (
-        <Modal visible={true} transparent={false} animationType="none">
-          <SplashScreen />
-        </Modal>
-      )}
-      <ScrollView style={[styles.scrollView, { backgroundColor: isDark ? '#1a1a1a' : '#f8f9fa' }]} showsVerticalScrollIndicator={false}>
-        <LoaderSpinner shouldLoad={loading && initialDataLoaded} />
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={backgroundGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <ThemedView style={[styles.mainContainer, { backgroundColor: 'transparent' }]}>
+        {!initialDataLoaded && (
+          <Modal visible={true} transparent={false} animationType="none">
+            <SplashScreen />
+          </Modal>
+        )}
+        <ScrollView style={[styles.scrollView, { backgroundColor: 'transparent' }]} showsVerticalScrollIndicator={false}>
+          <LoaderSpinner shouldLoad={loading && initialDataLoaded} />
 
-        {/* Header Section */}
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerSection}>
-          <View style={styles.headerTop}>
-            <View>
-              <ThemedText style={styles.greeting}>Financial Dashboard</ThemedText>
-              <ThemedText style={styles.subGreeting}>Manage your finances effortlessly</ThemedText>
-            </View>
-            <Icon name="account-balance-wallet" size={40} color="#FFF" />
-          </View>
-
-          {!showDropdowns ? (
-            <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDropdowns(true)}>
-              <Icon name="calendar-today" size={20} color="#FFF" />
-              <ThemedText style={styles.dateText}>
-                {months.find((m) => m.value === Month)?.label} {Year}
-              </ThemedText>
-              <Icon name="expand-more" size={20} color="#FFF" />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.dropdownsContainer}>
-              <View style={styles.dropdownBox}>
-                <DropDownPicker open={openMonth} value={Month} items={months} setValue={handleMonthSelect} setItems={setMonths}
-                  placeholder="Month"
-                  style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                  dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                  textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
-                  listMode="SCROLLVIEW"
-                  setOpen={(isOpen) => {
-                    setOpenMonth(isOpen);
-                    if (isOpen) { setOpenYear(false); }
-                  }}
-                  theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
-                />
+          {/* Header Section */}
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerSection}>
+            <View style={styles.headerGreetingRow}>
+              <View style={styles.headerGreetingText}>
+                <ThemedText style={[styles.headerGreeting, { color: '#fff' }]}>
+                  Hello, {displayName} 👋
+                </ThemedText>
+                <ThemedText style={[styles.headerSubGreeting, { color: 'rgba(255,255,255,0.82)' }]}>
+                  Here's your finance overview
+                </ThemedText>
               </View>
-              <View style={styles.dropdownBox}>
-                <DropDownPicker open={openYear} value={Year} items={years} setValue={handleYearSelect} setItems={setYears} placeholder="Year"
-                  style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                  dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                  textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
-                  listMode="SCROLLVIEW"
-                  setOpen={(isOpen) => {
-                    setOpenYear(isOpen);
-                    if (isOpen) { setOpenMonth(false); }
-                  }}
-                  theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
-                />
-              </View>
+              <LinearGradient colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.12)']} style={styles.headerAvatarMini}>
+                <Icon name="account-circle" size={26} color="#fff" />
+              </LinearGradient>
             </View>
-          )}
-        </LinearGradient>
 
-        {/* Main Stats Section */}
-        <View style={styles.statsContainer}>
-          {statCardConfigs.map(({ key, ...cardProps }) => (
-            <AnimatedStatCard key={key} {...cardProps} />
-          ))}
-        </View>
+            {!showDropdowns ? (
+              <TouchableOpacity style={styles.datePill} activeOpacity={0.85} onPress={() => setShowDropdowns(true)}>
+                <Icon name="calendar-today" size={18} color="#fff" />
+                <ThemedText style={styles.datePillText}>
+                  {months.find((m) => m.value === Month)?.label} {Year}
+                </ThemedText>
+                <Icon name="unfold-more" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.dropdownsGlass}>
+                <View style={styles.dropdownBox}>
+                  <DropDownPicker open={openMonth} value={Month} items={months} setValue={handleMonthSelect} setItems={setMonths}
+                    placeholder="Month"
+                    style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#ffffff' }]}
+                    dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: isDark ? 'rgba(15,23,42,0.98)' : '#ffffff' }]}
+                    textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
+                    listMode="SCROLLVIEW"
+                    setOpen={(isOpen) => {
+                      setOpenMonth(isOpen);
+                      if (isOpen) { setOpenYear(false); }
+                    }}
+                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+                  />
+                </View>
+                <View style={styles.dropdownBox}>
+                  <DropDownPicker open={openYear} value={Year} items={years} setValue={handleYearSelect} setItems={setYears} placeholder="Year"
+                    style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#ffffff' }]}
+                    dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: isDark ? 'rgba(15,23,42,0.98)' : '#ffffff' }]}
+                    textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
+                    listMode="SCROLLVIEW"
+                    setOpen={(isOpen) => {
+                      setOpenYear(isOpen);
+                      if (isOpen) { setOpenMonth(false); }
+                    }}
+                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
+                  />
+                </View>
+              </View>
+            )}
+          </LinearGradient>
 
-        <View style={styles.summarySectionContainer}>
-          {renderInsightsHeader()}
-          {renderSummarySection()}
-        </View>
-
-
-        {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          {/* <ThemedText style={styles.sectionTitle}>Quick Actions</ThemedText> */}
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity style={[styles.quickActionCard, { backgroundColor: isDark ? '#2d2d2d' : '#fff' }]} onPress={handlePressExpenceByCat}>
-              <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.actionIconBg}>
-                <Icon name="pie-chart" size={24} color="#fff" />
-              </LinearGradient>
-              <ThemedText style={styles.actionCardText}>Expenses by Category</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.quickActionCard, { backgroundColor: isDark ? '#2d2d2d' : '#fff' }]} onPress={handlePressBalance}>
-              <LinearGradient colors={['#06b6d4', '#0891b2']} style={styles.actionIconBg}>
-                <Icon name="assessment" size={24} color="#fff" />
-              </LinearGradient>
-              <ThemedText style={styles.actionCardText}>Balance Details</ThemedText>
-            </TouchableOpacity>
+          {/* Main Stats Section */}
+          <View style={styles.statsContainer}>
+            {statCardConfigs.map(({ key, ...cardProps }) => (
+              <AnimatedStatCard key={key} {...cardProps} />
+            ))}
           </View>
-        </View>
 
-        {/* Management Section */}
-        <View style={styles.quickActionsContainer}>
-          {/* <ThemedText style={styles.sectionTitle}>Management</ThemedText> */}
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity style={[styles.quickActionCard, { backgroundColor: isDark ? '#2d2d2d' : '#fff' }]} onPress={handlePressCategories}>
-              <LinearGradient colors={[withAlpha('#a855f7', 0.95), withAlpha('#6366f1', 0.85)]} style={styles.actionIconBg}>
-                <Icon name="category" size={24} color="#fff" />
-              </LinearGradient>
-              <ThemedText style={styles.actionCardText}>Categories</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.quickActionCard, { backgroundColor: isDark ? '#2d2d2d' : '#fff' }]} onPress={handlePressProducts}>
-              <LinearGradient colors={[withAlpha('#f97316', 0.95), withAlpha('#fb7185', 0.85)]} style={styles.actionIconBg}>
-                <Icon name="shopping-bag" size={24} color="#fff" />
-              </LinearGradient>
-              <ThemedText style={styles.actionCardText}>Expense ITEMS</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.quickActionCard, { backgroundColor: isDark ? '#2d2d2d' : '#fff' }]} onPress={handlePressSources}>
-              <LinearGradient colors={[withAlpha('#34d399', 0.95), withAlpha('#059669', 0.85)]} style={styles.actionIconBg}>
-                <Icon name="account-balance" size={24} color="#fff" />
-              </LinearGradient>
-              <ThemedText style={styles.actionCardText}>Sources</ThemedText>
-            </TouchableOpacity>
+          <View style={styles.summarySectionContainer}>
+            {renderInsightsHeader()}
+            {renderSummarySection()}
           </View>
-        </View>
 
-        <View style={styles.bottomPadding} />
-      </ScrollView>
-    </ThemedView>
+          {loadError ? (
+            <View style={styles.errorBanner}>
+              <Icon name="cloud-off" size={18} color="#dc2626" />
+              <ThemedText style={styles.errorBannerText}>{loadError}</ThemedText>
+            </View>
+          ) : null}
+
+
+          {/* Quick Actions */}
+          <View style={styles.quickActionsContainer}>
+            {/* <ThemedText style={styles.sectionTitle}>Quick Actions</ThemedText> */}
+            <View style={styles.actionsGrid}>
+              <TouchableOpacity style={[styles.quickActionCard, isDark ? { backgroundColor: '#2d2d2d' } : { backgroundColor: palette.quickActionBg, borderColor: palette.quickActionBorder, borderWidth: 1 }]} onPress={handlePressExpenceByCat}>
+                <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.actionIconBg}>
+                  <Icon name="pie-chart" size={24} color="#fff" />
+                </LinearGradient>
+                <ThemedText style={styles.actionCardText}>Expenses by Category</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.quickActionCard, isDark ? { backgroundColor: '#2d2d2d' } : { backgroundColor: palette.quickActionBg, borderColor: palette.quickActionBorder, borderWidth: 1 }]} onPress={handlePressBalance}>
+                <LinearGradient colors={['#06b6d4', '#0891b2']} style={styles.actionIconBg}>
+                  <Icon name="assessment" size={24} color="#fff" />
+                </LinearGradient>
+                <ThemedText style={styles.actionCardText}>Balance Details</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Management Section */}
+          <View style={styles.quickActionsContainer}>
+            {/* <ThemedText style={styles.sectionTitle}>Management</ThemedText> */}
+            <View style={styles.actionsGrid}>
+              <TouchableOpacity style={[styles.quickActionCard, isDark ? { backgroundColor: '#2d2d2d' } : { backgroundColor: palette.quickActionBg, borderColor: palette.quickActionBorder, borderWidth: 1 }]} onPress={handlePressCategories}>
+                <LinearGradient colors={[withAlpha('#a855f7', 0.95), withAlpha('#6366f1', 0.85)]} style={styles.actionIconBg}>
+                  <Icon name="category" size={24} color="#fff" />
+                </LinearGradient>
+                <ThemedText style={styles.actionCardText}>Categories</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.quickActionCard, isDark ? { backgroundColor: '#2d2d2d' } : { backgroundColor: palette.quickActionBg, borderColor: palette.quickActionBorder, borderWidth: 1 }]} onPress={handlePressProducts}>
+                <LinearGradient colors={[withAlpha('#f97316', 0.95), withAlpha('#fb7185', 0.85)]} style={styles.actionIconBg}>
+                  <Icon name="shopping-bag" size={24} color="#fff" />
+                </LinearGradient>
+                <ThemedText style={styles.actionCardText}>Expense ITEMS</ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.quickActionCard, isDark ? { backgroundColor: '#2d2d2d' } : { backgroundColor: palette.quickActionBg, borderColor: palette.quickActionBorder, borderWidth: 1 }]} onPress={handlePressSources}>
+                <LinearGradient colors={[withAlpha('#34d399', 0.95), withAlpha('#059669', 0.85)]} style={styles.actionIconBg}>
+                  <Icon name="account-balance" size={24} color="#fff" />
+                </LinearGradient>
+                <ThemedText style={styles.actionCardText}>Sources</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.bottomPadding} />
+        </ScrollView>
+      </ThemedView>
+    </View>
   );
 };
 
@@ -649,45 +629,65 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 28,
+    paddingTop: 22,
+    paddingBottom: 26,
   },
-  headerTop: {
+  headerGreetingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  greeting: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 4,
+  headerGreetingText: {
+    flexShrink: 1,
+    marginRight: 12,
   },
-  subGreeting: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+  headerGreeting: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  headerSubGreeting: {
+    fontSize: 13,
     fontWeight: '500',
+    marginTop: 3,
   },
-  dateSelector: {
+  headerAvatarMini: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  datePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 16,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     gap: 10,
   },
-  dateText: {
+  datePillText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
   },
-  dropdownsContainer: {
+  dropdownsGlass: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    borderRadius: 16,
+    padding: 12,
   },
   dropdownBox: {
     flex: 1,
@@ -852,11 +852,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    // elevation: 2,
+    // shadowColor: '#000',
+    // shadowOffset: { width: 0, height: 1 },
+    // shadowOpacity: 0.06,
+    // shadowRadius: 3,
   },
   actionIconBg: {
     width: 56,
@@ -876,6 +876,25 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 24,
   },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(220, 38, 38, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.35)',
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#dc2626',
+  },
   summaryGrid: {
     flexDirection: 'row',
     // flexWrap: 'wrap',
@@ -885,10 +904,24 @@ const styles = StyleSheet.create({
     width: '48%',
     marginBottom: 1,
   },
+  summaryCardTouchable: {
+    flex: 1,
+  },
+  summaryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryIconMargin: {
+    marginRight: 2,
+  },
+  summaryChevron: {
+    marginLeft: 'auto',
+    opacity: 0.85,
+  },
   summaryCard: {
     borderRadius: 20,
     padding: 18,
-    margin: 5
+    margin: 5,
   },
   summaryCardContent: {
     flexDirection: 'column',

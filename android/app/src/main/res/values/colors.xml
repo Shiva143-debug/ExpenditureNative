@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Sampled from the ex-logo artwork (assets/images/ex-logo.jpeg), whose
+      background is a flat dark navy. Keeping it as the adaptive-icon
+      background layer preserves the original look while letting the launcher
+      apply its own mask shape.
+    -->
+    <color name="ic_launcher_background">#050E17</color>
+</resources>

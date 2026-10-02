@@ -27,6 +27,12 @@ import SourcesScreen from '../screens/dashboard/SourcesScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+// Defined at module scope on purpose: an inline arrow here would be a new
+// component type on every render, which remounts the tab bar / header and
+// throws away its state.
+const renderTabBar = props => <Footer {...props} />;
+const renderHeader = () => <Header />;
+
 const DashboardStack = () => {
   return (
     <Stack.Navigator>
@@ -46,7 +52,7 @@ const DashboardStack = () => {
 };
 
 const MainTabs = () => (
-  <Tab.Navigator tabBar={props => <Footer {...props} />}
+  <Tab.Navigator tabBar={renderTabBar}
     screenOptions={{ headerShown: false,}}>
     <Tab.Screen name="dashboard" component={DashboardStack} options={{ title: "Dashboard" }} />
     <Tab.Screen name="Add" component={Add} options={{ title: "Add" }} />
@@ -67,7 +73,7 @@ const AppNavigator = () => {
       ) : (
         <Stack.Screen  name="MainTabs"  component={MainTabs}
           options={{
-            header: ({ navigation }) => <Header navigation={navigation} />,
+            header: renderHeader,
           }}
         />
       )}

@@ -1,19 +1,74 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Animated, Easing, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import LoaderSpinner from '../../../components/LoaderSpinner';
 import ThemedView from '../../../components/ThemedView';
 import ThemedText from '../../../components/ThemedText';
-import { useAuth } from '../../../context/AuthContext';
 import { getExpenseCosts } from '../../../services/apiService';
+import { getExpenseCategoryIcon } from '../../../theme/entityIcons';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
-const ExpenseByCategoryList = () => {
-  const { id } = useAuth();
-  const [year] = useState(new Date().getFullYear().toString());
-  const [expenses, setExpenses] = useState([]);
+
+const AnimatedExpenseCard = ({ item, index }) => {
+  const iconName = getExpenseCategoryIcon(item.category);
+  const cardTranslateY = useRef(new Animated.Value(12)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(cardTranslateY, {
+        toValue: 0,
+        duration: 400,
+        delay: index * 60,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 60,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+      }, [index, cardOpacity, cardTranslateY]);
+
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ translateY: cardTranslateY }],
+        opacity: cardOpacity,
+      }}
+    >
+      <ThemedView style={styles.cardContainer}>
+        <LinearGradient colors={['#2C3E50', '#34495E']} style={styles.card}>
+          <View style={styles.cardContent}>
+            <View style={{ display: "flex", flexDirection: "row" }}>
+              <View style={styles.iconContainer}>
+                <Icon name={iconName} size={32} color="#FFF" />
+              </View>
+              <View>
+                <ThemedText style={styles.category}>{item.category}</ThemedText>
+                <ThemedText style={styles.amount}>{item.TotalCost.toLocaleString()}</ThemedText>
+              </View>
+            </View>
+
+            <ThemedText style={styles.percentage}>{item.percentage}%</ThemedText>
+
+          </View>
+
+        </LinearGradient>
+      </ThemedView>
+    </Animated.View>
+  );
+};
+
+  const ExpenseByCategoryList = () => {
+    const [expenses, setExpenses] = useState([]);
+
   const [groupedExpenses, setGroupedExpenses] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -47,167 +102,16 @@ const ExpenseByCategoryList = () => {
     outputRange: [12, 0],
   });
 
-  // Category to icon mapping
-  const categoryIcons = {
-    // Mobile & Recharge related
-    'Recharge': 'smartphone',
-    'Mobile Recharge': 'smartphone',
-    'Phone Recharge': 'phone-android',
-    'Data Recharge': 'signal-cellular-alt',
-    'DTH': 'tv',
-
-    // Cutting & Salon related
-    'Cutting': 'content-cut',
-    'Hair Cut': 'content-cut',
-    'Salon': 'content-cut',
-    'Haircut': 'content-cut',
-    'Barber': 'content-cut',
-
-    // Vehicle related
-    'Vehicle': 'two-wheeler',
-    'Bike': 'two-wheeler',
-    'Motorcycle': 'two-wheeler',
-    'Scooter': 'two-wheeler',
-    'Bicycle': 'pedal-bike',
-    'Car Service': 'directions-car',
-    'Vehicle Service': 'build',
-    'Vehicle Repair': 'build',
-    'Petrol': 'local-gas-station',
-    'Diesel': 'local-gas-station',
-
-    // Keep existing categories...
-    'Food': 'restaurant',
-    'food': 'restaurant',
-    'Food and Dining': 'restaurant',
-    'Restaurant': 'restaurant-menu',
-    'Groceries': 'local-grocery-store',
-    'grocery': 'local-grocery-store',
-
-    'Transportation': 'directions-car',
-    'transport': 'directions-car',
-    'Car': 'directions-car',
-    'Fuel': 'local-gas-station',
-    'Bus': 'directions-bus',
-    'Train': 'train',
-    'Taxi': 'local-taxi',
-
-    'Shopping': 'shopping-cart',
-    'Clothing': 'checkroom',
-    'Fashion': 'checkroom',
-    'Electronics': 'devices',
-    'Accessories': 'watch',
-
-    'Entertainment': 'movie',
-    'Movies': 'movie',
-    'Games': 'sports-esports',
-    'Sports': 'sports-basketball',
-    'Music': 'music-note',
-
-    'Healthcare': 'local-hospital',
-    'Medical': 'medical-services',
-    'Medicine': 'medication',
-    'Doctor': 'healing',
-    'Health': 'favorite',
-
-    'Education': 'school',
-    'Books': 'menu-book',
-    'Tuition': 'cast-for-education',
-    'Courses': 'class',
-    'Training': 'psychology',
-
-    'Bills': 'receipt',
-    'Utilities': 'power',
-    'Electricity': 'bolt',
-    'Water': 'water-drop',
-    'Internet': 'wifi',
-    'Phone': 'phone',
-    'Mobile': 'smartphone',
-
-    'Housing': 'home',
-    'Rent': 'house',
-    'Maintenance': 'build',
-    'Furniture': 'chair',
-    'Appliances': 'kitchen',
-
-    'Travel': 'flight',
-    'Hotel': 'hotel',
-    'Vacation': 'beach-access',
-    'Tourism': 'tour',
-
-    'Insurance': 'security',
-    'Investment': 'trending-up',
-    'Savings': 'savings',
-    'Banking': 'account-balance',
-
-    'Personal Care': 'face',
-    'Fitness': 'fitness-center',
-    'Beauty': 'spa',
-
-    'Gifts': 'card-giftcard',
-    'Donations': 'volunteer-activism',
-    'Charity': 'favorite-border',
-
-    'Business': 'business-center',
-    'Office': 'business',
-    'Stationery': 'edit',
-
-    'Pets': 'pets',
-    'Pet Food': 'pets',
-    'Veterinary': 'healing',
-
-    // Default icon for unknown categories
-    'default': 'payments'
-  };
-
-  const getIconForCategory = (category) => {
-    if (!category) return categoryIcons.default;
-
-    // Convert category to lowercase for case-insensitive matching
-    const normalizedCategory = category.toLowerCase();
-
-    // First try exact match
-    if (categoryIcons[category]) {
-      return categoryIcons[category];
-    }
-
-    // Then try case-insensitive match
-    const exactMatch = Object.keys(categoryIcons).find(
-      key => key.toLowerCase() === normalizedCategory
-    );
-    if (exactMatch) {
-      return categoryIcons[exactMatch];
-    }
-
-    // Try to find partial matches
-    const partialMatch = Object.keys(categoryIcons).find(
-      key => normalizedCategory.includes(key.toLowerCase()) ||
-        key.toLowerCase().includes(normalizedCategory)
-    );
-    if (partialMatch) {
-      return categoryIcons[partialMatch];
-    }
-
-    // Special cases for common variations
-    if (normalizedCategory.includes('recharge') || normalizedCategory.includes('mobile')) {
-      return 'smartphone';
-    }
-    if (normalizedCategory.includes('cut') || normalizedCategory.includes('salon')) {
-      return 'content-cut';
-    }
-    if (normalizedCategory.includes('bike') || normalizedCategory.includes('vehicle')) {
-      return 'two-wheeler';
-    }
-
-    // Return default icon if no match found
-    return categoryIcons.default;
-  };
-
   const getExpensesByYear = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getExpenseCosts(id);
-      setExpenses(data);
+      const response = await getExpenseCosts();
+      if (response?.status) {
+        setExpenses(response.data || []);
+      } else {
+        setError(response?.message || 'Failed to fetch expenses');
+      }
     } catch (err) {
       setError(err.message);
       console.error('Error fetching expenses:', err);
@@ -231,8 +135,9 @@ const ExpenseByCategoryList = () => {
       duration: 500,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
-    }).start();
-  }, []);
+        }).start();
+      }, [headerReveal]);
+
 
   useEffect(() => {
     const filteredTotalCostData = expenses.filter(
@@ -330,7 +235,8 @@ const ExpenseByCategoryList = () => {
         }
       });
     }
-  }, [openYear, showDropdown]);
+      }, [openYear, showDropdown, arrowAnimation, dropdownOpacity, dropdownScale, dropdownTranslate]);
+
 
   const toggleSort = () => {
     if (sortBy === 'amount') {
@@ -359,60 +265,6 @@ const ExpenseByCategoryList = () => {
     inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
   });
-
-  const AnimatedExpenseCard = ({ item, index }) => {
-    const iconName = getIconForCategory(item.category);
-    const cardTranslateY = useRef(new Animated.Value(12)).current;
-    const cardOpacity = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      Animated.parallel([
-        Animated.timing(cardTranslateY, {
-          toValue: 0,
-          duration: 400,
-          delay: index * 60,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(cardOpacity, {
-          toValue: 1,
-          duration: 400,
-          delay: index * 60,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, [index]);
-
-    return (
-      <Animated.View
-        style={{
-          transform: [{ translateY: cardTranslateY }],
-          opacity: cardOpacity,
-        }}
-      >
-        <ThemedView style={styles.cardContainer}>
-          <LinearGradient colors={['#2C3E50', '#34495E']} style={styles.card}>
-            <View style={styles.cardContent}>
-              <View style={{ display: "flex", flexDirection: "row" }}>
-                <View style={styles.iconContainer}>
-                  <Icon name={iconName} size={32} color="#FFF" />
-                </View>
-                <View>
-                  <ThemedText style={styles.category}>{item.category}</ThemedText>
-                  <ThemedText style={styles.amount}>₹{item.TotalCost.toLocaleString()}</ThemedText>
-                </View>
-              </View>
-
-              <ThemedText style={styles.percentage}>{item.percentage}%</ThemedText>
-
-            </View>
-
-          </LinearGradient>
-        </ThemedView>
-      </Animated.View>
-    );
-  };
 
   const renderItem = ({ item, index }) => (
     <AnimatedExpenseCard item={item} index={index} />
@@ -468,7 +320,7 @@ const ExpenseByCategoryList = () => {
             </View>
           </View>
           <View style={styles.headerAmountRow}>
-            <ThemedText style={styles.headerAmount}>₹{totalAmount.toLocaleString()}</ThemedText>
+            <ThemedText style={styles.headerAmount}>{totalAmount.toLocaleString()}</ThemedText>
             <View style={styles.headerYearChip}>
               <Icon name="event" size={16} color="#1B5E20" />
               <ThemedText style={styles.headerYearLabel}>{Year}</ThemedText>
@@ -699,7 +551,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
   },
   listContainer: {
     paddingBottom: 16,
@@ -744,7 +595,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
-    paddingHorizontal: 16,
+    // paddingHorizontal: 16,
   },
   sortButton: {
     padding: 8,

@@ -1,11 +1,12 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base URL for all API calls
 // https://backend-exp-1.onrender.com
 // https://exciting-spice-armadillo.glitch.me
 // const BASE_URL = 'https://backend-exp-1.onrender.com';
 const BASE_URL = 'https://backend-exp.onrender.com';
-// const BASE_URL = "http://192.168.1.62:5000"
+// const BASE_URL = "http://192.168.1.84:4000"
 
 
 // Create axios instance with default config
@@ -16,59 +17,111 @@ const api = axios.create({
   },
 });
 
-// Error handler helper
-const handleError = (error, customMessage = 'An error occurred') => {
-  console.error(`${customMessage}:`, error);
-  throw error;
+// Attach the auth token to every request
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Error attaching auth token:', error);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Standard response helpers
+// Every API response is normalized to { status, message, data } so callers
+// only ever check `response.status`.
+// `ok` guarantees the wrapper shape: `status` is derived from the backend's
+// own `status` (or `success`) flag, `message` is taken from the backend, and
+// `data` holds the raw backend body. `fail` handles thrown/network errors.
+const ok = (response) => {
+  const body = response.data ?? {};
+  const success =
+    typeof body?.status === 'boolean'
+      ? body.status
+      : typeof body?.success === 'boolean'
+      ? body.success
+      : true;
+  // Unwrap one level: if the backend already wraps the payload in `data`,
+  // expose that as `data`; otherwise use the body itself (e.g. a raw array).
+  const payload = body?.data !== undefined ? body.data : body;
+  return {
+    status: success,
+    message: body?.message ?? '',
+    data: payload,
+  };
+};
+
+const fail = (error, fallbackMessage = 'Something went wrong') => {
+  const payload = error?.response?.data;
+  const message = payload?.message || error?.message || fallbackMessage;
+  return { status: false, message, data: null };
 };
 
 
 // ==================== USER RELATED API CALLS ====================
 
 
-
 export const registerUser = async (userData) => {
   try {
     const response = await api.post('/register', userData);
-    return response.data;
+    return ok(response);
   } catch (error) {
-    // 🔥 rethrow backend error so screen can catch it
-    throw error;
+    return fail(error, 'Error registering user');
   }
 };
 
 
 export const loginUser = async (loginData) => {
   try {
-    console.log('Login Data:', loginData);
     const response = await api.post('/login', loginData);
-    return response.data;
+    return ok(response);
   } catch (error) {
-    handleError(error.message, 'Error logging in');
+    return fail(error, 'Error logging in');
+  }
+};
+
+
+// ==================== STATS RELATED API CALLS ====================
+
+// Aggregated income / expense / savings / tax totals for a single month+year.
+// Values come back as strings (Postgres numeric), so parse them before use.
+export const getStats = async (month, year) => {
+  try {
+    const response = await api.get(`/get-stats/${month}/${year}`);
+    return ok(response);
+  } catch (error) {
+    return fail(error, 'Error fetching stats');
   }
 };
 
 // ==================== EXPENSE RELATED API CALLS ====================
 
 //instead of getting all expenses get only needed
-export const getExpenseCosts = async (userId) => {
+export const getExpenseCosts = async () => {
   try {
-    const response = await api.get(`/get-all-expenses/${userId}`);
-    return response.data;
+    const response = await api.get('/get-all-expenses');
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error fetching expense costs');
+    return fail(error, 'Error fetching expense costs');
   }
 };
 
 //have to write filter expenses in backend
-export const getFilteredExpenses = async (userId, month, year) => {
+export const getFilteredExpenses = async (month, year) => {
   try {
-    const allExpenses = await getExpenseCosts(userId);
+    const result = await getExpenseCosts();
+    const allExpenses = result?.status ? result.data : [];
 
     if (Array.isArray(allExpenses)) {
       // Filter by selected month and year
       const filteredByDate = allExpenses.filter(item => {
-        const date = new Date(item.p_date);
+        const date = new Date(item.pDate);
         return (
           date.getMonth() + 1 === month && // getMonth() is 0-based
           date.getFullYear() === year
@@ -77,86 +130,83 @@ export const getFilteredExpenses = async (userId, month, year) => {
 
       // Sort filtered data by date (descending)
       return filteredByDate.sort(
-        (a, b) => new Date(b.p_date) - new Date(a.p_date)
+        (a, b) => new Date(b.pDate) - new Date(a.pDate)
       );
     }
 
     return [];
   } catch (error) {
-    handleError(error, 'Error filtering expenses');
-    return [];
+    return fail(error, 'Error filtering expenses').data ?? [];
   }
 };
 
 export const addExpense = async (expenseData) => {
   try {
     const response = await api.post('/add-expense', expenseData);
-    return response.data;
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error adding expense');
+    return fail(error, 'Error adding expense');
   }
 };
 
 export const updateExpense = async (expenseId, payload) => {
   try {
     const res = await api.put(`/update-expense/${expenseId}`, payload);
-    return res.data;
+    return ok(res);
   }
   catch (error) {
-    handleError(error, 'Error updating expense');
+    return fail(error, 'Error updating expense');
   }
 };
 
-export const deleteExpense = async (expenseId, userId) => {
+export const deleteExpense = async (expenseId) => {
   try {
-    const response = await api.delete(`/delete-expence/${expenseId}/${userId}`);
-    return response.data;
+    const response = await api.delete(`/delete-expence/${expenseId}`);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error deleting expense');
+    return fail(error, 'Error deleting expense');
   }
 };
 
 
 // ==================== CATEGORY RELATED API CALLS ====================
 
-export const getCategories = async (userId) => {
+export const getCategories = async () => {
   try {
-    const response = await api.get(`/categories/${userId}`);
-    return response.data;
+    const response = await api.get('/categories');
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error fetching categories');
+    return fail(error, 'Error fetching categories');
   }
 };
 
-export const addCategory = async (userId, category) => {
+export const addCategory = async (category) => {
   try {
-    const response = await api.post('/add-category', { userId, category });
-    return response.data;
+    const response = await api.post('/add-category', { category });
+    return ok(response);
   } catch (error) {
-    return response.data.message;
+    return fail(error, 'Error adding category');
   }
 };
 
-export const updateCategory = async (categoryId, userId, oldCategory, newCategory) => {
+export const updateCategory = async (categoryId, oldCategory, newCategory) => {
   try {
     const res = await api.put(`/update-category/${categoryId}`, {
       oldCategory,
-      newCategory,
-      userId
+      newCategory
     });
-    return res.data;
+    return ok(res);
   } catch (error) {
-    console.error("Error updating category:", error);
-    throw error;
+    return fail(error, 'Error updating category');
   }
 };
 
-export const deleteCategory = async (categoryId, userId) => {
+export const deleteCategory = async (categoryId) => {
   try {
-    const response = await api.delete(`/delete-category/${categoryId}/${userId}`);
-    return response.data;
+    const response = await api.delete(`/delete-category/${categoryId}`);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error deleting category');
+    return fail(error, 'Error deleting category');
   }
 };
 
@@ -164,189 +214,172 @@ export const deleteCategory = async (categoryId, userId) => {
 
 // ==================== SAVINGS RELATED API CALLS ====================
 
-export const getSavingsData = async (userId) => {
+export const getSavingsData = async () => {
   try {
-    const response = await api.get(`/get-savings/${userId}`);
-    return response.data;
+    const response = await api.get('/get-savings');
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error fetching savings');
-  }
-};
-
-export const getSavingsDataByMonthYear = async (userId, month, year) => {
-  try {
-    const response = await api.get(`/get-savings-by-month-year/${userId}/${month}/${year}`);
-    return response.data;
-  } catch (error) {
-    handleError(error, 'Error fetching savings');
+    return fail(error, 'Error fetching savings');
   }
 };
 
 export const addSaving = async (savingData) => {
   try {
     const response = await api.post('/add-savings', savingData);
-    return response.data;
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error adding saving');
+    return fail(error, 'Error adding saving');
   }
 };
 
 export const updateSavings = async (savingId, payload) => {
   try {
     const res = await api.put(`/update-savings/${savingId}`, payload);
-    return res.data;
+    return ok(res);
   } catch (error) {
-    console.error("Error updating savings:", error);
-    throw error;
+    return fail(error, 'Error updating savings');
   }
 };
 
-export const deleteSaving = async (savingId, userId) => {
+export const deleteSaving = async (savingId) => {
   try {
-    const response = await api.delete(`/delete-saving/${savingId}/${userId}`);
-    return response.data;
+    const response = await api.delete(`/delete-saving/${savingId}`);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error deleting saving');
+    return fail(error, 'Error deleting saving');
   }
 };
 
 // ==================== EXPENSE_ITEM RELATED API CALLS ====================
 
-export const getExpenseItems = async (userId) => {
+export const getExpenseItems = async () => {
   try {
-    const response = await api.get(`/get-expense-items/${userId}`);
-    return response.data;
+    const response = await api.get('/get-expense-items');
+    return ok(response);
   } catch (error) {
-    console.error('Error fetching expense items:', error);
-    throw error;
+    return fail(error, 'Error fetching expense items');
   }
 };
 
-export const getExpenseItemsByCategory = async (userId, categoryName) => {
+export const getExpenseItemsByCategory = async (categoryId) => {
   try {
-    const response = await api.get(`/get-expense-items-by-category?category=${categoryName}&userId=${userId}`);
-    return response.data;
+    const response = await api.get(`/get-expense-items-by-category?categoryId=${categoryId}`);
+    return ok(response);
   } catch (error) {
-    console.error('Error fetching expense items by category:', error);
-    throw error;
+    return fail(error, 'Error fetching expense items by category');
   }
 };
 
-export const addExpenseItem = async (userId, category, expenseName) => {
+export const addExpenseItem = async (categoryId, expenseName) => {
   try {
-    const response = await api.post('/add-expense-item', { id: userId, category, expenseName });
-    return response.data;
+    const response = await api.post('/add-expense-item', { categoryId, expenseName });
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error adding expense item');
+    return fail(error, 'Error adding expense item');
   }
 };
 
-export const updateExpenseItem = async (expenseItemId, userId, newexpenseItem) => {
+export const updateExpenseItem = async (expenseItemId, newexpenseItem) => {
   try {
-    const res = await api.put(`/update-expense-item/${expenseItemId}/${userId}`, { newexpenseItem });
-    return res.data;
+    const res = await api.put(`/update-expense-item/${expenseItemId}`, { newexpenseItem });
+    return ok(res);
   } catch (error) {
-    console.error('Error updating expense item:', error);
-    throw error;
+    return fail(error, 'Error updating expense item');
   }
 };
 
-export const deleteExpenseItem = async (expenseItemId, userId) => {
+export const deleteExpenseItem = async (expenseItemId) => {
   try {
-    const response = await api.delete(`/delete-expense-item/${expenseItemId}/${userId}`);
-    return response.data;
+    const response = await api.delete(`/delete-expense-item/${expenseItemId}`);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error deleting Expense Item');
+    return fail(error, 'Error deleting Expense Item');
   }
 };
 
 // ==================== INCOME_SOURCE RELATED API CALLS ====================
 
-export const getIncomeSources = async (userId) => {
+export const getIncomeSources = async () => {
   try {
-    const response = await api.get(`/get-income-sources/${userId}`);
-    return response.data;
+    const response = await api.get('/get-income-sources');
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error fetching default sources');
+    return fail(error, 'Error fetching default sources');
   }
 };
 
 export const addIncomeSource = async (sourceData) => {
   try {
     const response = await api.post('/add-income-source', sourceData);
-    return response.data;
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error adding default source');
+    return fail(error, 'Error adding default source');
   }
 };
 
-export const updateIncomeSource = async (sourceId, userId, updatedSource) => {
+export const updateIncomeSource = async (sourceId, updatedSource) => {
   try {
-    const response = await api.put(`/update-income-source/${sourceId}/${userId}`, updatedSource);
-    return response.data;
+    const response = await api.put(`/update-income-source/${sourceId}`, updatedSource);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error updating source of income');
-    throw error;
+    return fail(error, 'Error updating source of income');
   }
 };
 
-export const deleteIncomeSource = async (sourceId, userId) => {
+export const deleteIncomeSource = async (sourceId) => {
   try {
-    const response = await api.delete(`/delete-income-source/${sourceId}/${userId}`);
-    return response.data;
+    const response = await api.delete(`/delete-income-source/${sourceId}`);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error deleting source');
+    return fail(error, 'Error deleting source');
   }
 };
 
 // ==================== INCOME RELATED API CALLS ====================
 
 
-export const getIncomeByMonthYear = async (userId, month, year) => {
+export const getIncomeByMonthYear = async (month, year) => {
   try {
-    const response = await api.get(`/get-income-by-month-year/${userId}/${month}/${year}`);
-    return response.data;
+    const response = await api.get(`/get-income-by-month-year/${month}/${year}`);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error fetching income sources');
+    return fail(error, 'Error fetching income sources');
   }
 };
 
-export const getTotalIncomeData = async (userId) => {
+export const getTotalIncomeData = async () => {
   try {
-    const response = await api.get(`/get-total-income/${userId}`);
-    return response.data;
+    const response = await api.get('/get-total-income');
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error fetching source data');
+    return fail(error, 'Error fetching source data');
   }
 };
 
 export const addIncome = async (sourceData) => {
   try {
     const response = await api.post('/add-income', sourceData);
-    return response.data;
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error adding source');
+    return fail(error, 'Error adding source');
   }
 };
 
-export const updateIncome = async (sourceId, userId, payload) => {
+export const updateIncome = async (id, payload) => {
   try {
-    const res = await api.put(`/update-income/${sourceId}/${userId}`, payload);
-    return res.data;
+    const res = await api.put(`/update-income/${id}`, payload);
+    return ok(res);
+  } catch (error) {
+    return fail(error, 'Error updating source');
   }
-  catch (error) {
-    handleError("Error updating source", error);
-  }
-
-  return res.data;
 };
 
-export const deleteIncome = async (sourceId, userId) => {
+export const deleteIncome = async (sourceId) => {
   try {
-    const response = await api.delete(`/delete-income/${sourceId}/${userId}`);
-    return response.data;
+    const response = await api.delete(`/delete-income/${sourceId}`);
+    return ok(response);
   } catch (error) {
-    handleError(error, 'Error deleting source');
+    return fail(error, 'Error deleting source');
   }
 };
 
@@ -364,7 +397,6 @@ export default {
   getExpenseItems,
   getIncomeSources,
   getTotalIncomeData,
-  getIncomeSources,
   addIncome,
   updateIncome,
   addIncomeSource,
@@ -374,13 +406,12 @@ export default {
   registerUser,
   loginUser,
   getSavingsData,
-  getSavingsDataByMonthYear,
   deleteSaving,
   addSaving,
   updateSavings,
   deleteExpense,
   deleteExpenseItem,
   deleteCategory,
-  getIncomeByMonthYear
+  getIncomeByMonthYear,
+  getStats,
 };
-

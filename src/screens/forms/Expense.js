@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useContext, useMemo } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Modal, Alert } from 'react-native';
-import DropDownPicker from 'react-native-dropdown-picker';
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Modal, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { request, PERMISSIONS } from 'react-native-permissions';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -11,36 +10,15 @@ import Toast from "react-native-toast-message";
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from "@react-navigation/native";
 import LoaderSpinner from "../../components/LoaderSpinner";
-import ThemedView from "../../components/ThemedView";
-import { useAuth } from "../../context/AuthContext";
-import { ThemeContext } from "../../context/ThemeContext";
+import { useTheme } from "../../theme/useTheme";
 import ThemedTextAreaInput from "../../components/ThemedTextAreaInput";
+import FormDropdown from '../../components/FormDropdown';
+import { inputStyles as formStyles } from '../../styles';
 import { getCategories,getExpenseItemsByCategory, addCategory, addExpenseItem, addExpense } from "../../services/apiService";
 
-const Expense = ({ palette: propPalette }) => {
-    const { id } = useAuth();
-    const { theme } = useContext(ThemeContext);
-
-    const palette = useMemo(() => theme === 'dark'
-        ? {
-            background: '#0f172a',
-            cardBorder: 'rgba(148, 163, 184, 0.16)',
-            textPrimary: '#e2e8f0',
-            textSecondary: '#94a3b8',
-            savingBorder: 'rgba(148, 163, 184, 0.16)',
-            savingText: '#e2e8f0',
-            tabInactiveText: '#94a3b8',
-        }
-        : {
-            background: '#f5f7fb',
-            cardBorder: 'rgba(15, 23, 42, 0.08)',
-            textPrimary: '#0f172a',
-            textSecondary: '#475569',
-            savingBorder: 'rgba(15, 23, 42, 0.08)',
-            savingText: '#0f172a',
-            tabInactiveText: '#475569',
-        }, [theme]
-    );
+const Expense = () => {
+    const { palette: themePalettes } = useTheme();
+    const palette = themePalettes.form;
     const [visible, setVisible] = useState(false);
     const [ExpenseItemVisible, setExpenseItemVisible] = useState(false);
     const [refreshFlag, setRefreshFlag] = useState(false);
@@ -114,14 +92,17 @@ const Expense = ({ palette: propPalette }) => {
 
         try {
             setIsAddingCategory(true);
-            // Use the imported addCategory function from apiService
-            await addCategory(id, newCategory);
+            const response = await addCategory(newCategory);
 
-            Toast.show({
-                type: "success", text1: "Success", text2: "Category added successfully", position: "top", visibilityTime: 3000
-            });
-            setRefreshFlag(prev => !prev);
-            hideAddCategoryDialog();
+            if (response?.status) {
+                Toast.show({
+                    type: "success", text1: "Success", text2: response.message || "Category added successfully", position: "top", visibilityTime: 3000
+                });
+                setRefreshFlag(prev => !prev);
+                hideAddCategoryDialog();
+            } else {
+                Toast.show({ type: "error", text1: "Error", text2: response?.message || "Failed to add category", position: "top", visibilityTime: 3000 });
+            }
         } catch (error) {
             console.error('Error adding category:', error);
             Toast.show({ type: "error", text1: "Error", text2: "Failed to add category", position: "top", visibilityTime: 3000 });
@@ -143,12 +124,15 @@ const Expense = ({ palette: propPalette }) => {
 
         try {
             setIsAddingExpenseItem(true);
-            // Use the imported addExpenseItem function from apiService
-            await addExpenseItem(id, categoryValue, newExpenseItem);
+            const response = await addExpenseItem(categoryValue, newExpenseItem);
 
-            Toast.show({ type: "success", text1: "Success", text2: "Expense Item added successfully", position: "top", visibilityTime: 3000 });
-            setRefreshFlag(prev => !prev);
-            hideaddExpenseItemDialog();
+            if (response?.status) {
+                Toast.show({ type: "success", text1: "Success", text2: response.message || "Expense Item added successfully", position: "top", visibilityTime: 3000 });
+                setRefreshFlag(prev => !prev);
+                hideaddExpenseItemDialog();
+            } else {
+                Toast.show({ type: "error", text1: "Error", text2: response?.message || "Failed to add Expense Item", position: "top", visibilityTime: 3000 });
+            }
         } catch (error) {
             console.error('Error adding Expense Item:', error);
             Toast.show({ type: "error", text1: "Error", text2: "Failed to add Expense Item", position: "top", visibilityTime: 3000 });
@@ -163,7 +147,11 @@ const Expense = ({ palette: propPalette }) => {
     }, []);
 
     const requestPermissions = async () => {
+        if (Platform.OS !== 'android') return;
         try {
+            // On Android 13+ (API 33+) READ_EXTERNAL_STORAGE is removed and the
+            // image picker uses the system photo picker, so no permission is needed.
+            if (Number(Platform.Version) >= 33) return;
             const result = await request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
             console.log('Permission result:', result);
         } catch (error) {
@@ -173,22 +161,25 @@ const Expense = ({ palette: propPalette }) => {
 
     useEffect(() => {
         getCategoriesData();
-    }, [id, refreshFlag])
+    }, [refreshFlag])
 
     // Fetch Categories
     const getCategoriesData = async () => {
         try {
-            // Use the imported getCategories function from apiService
-            const data = await getCategories(id);
-
-            if (data) {
-                const transformedData = data.map(item => ({
-                    label: item.category,
-                    value: item.category,
-                    key: item.id.toString()
-                }));
-                setCategoryData(transformedData);
-                console.log('Categories fetched successfully.');
+            const response = await getCategories();
+            if (response?.status) {
+                const data = response.data;
+                if (data) {
+                    const transformedData = data.map(item => ({
+                        label: item.category,
+                        value: item.id,
+                        key: item.id.toString()
+                    }));
+                    setCategoryData(transformedData);
+                    console.log('Categories fetched successfully.');
+                }
+            } else {
+                Toast.show({ type: "error", text1: "Error", text2: response?.message || "Failed to load categories", position: "top", visibilityTime: 3000 });
             }
         } catch (error) {
             console.error('Error fetching categories:', error);
@@ -203,15 +194,20 @@ const Expense = ({ palette: propPalette }) => {
 
             try {
                 // Use the imported getExpenseItemsByCategory function from apiService
-                const data = await getExpenseItemsByCategory(id, categoryValue);
+                const response = await getExpenseItemsByCategory(categoryValue);
 
-                if (data) {
-                    const transformedData = data.map(item => ({
-                        label: item.expense_name,
-                        value: item.expense_name,
-                        key: item.id.toString()
-                    }));
-                    setExpenseItemData(transformedData);
+                if (response?.status) {
+                    const data = response.data;
+                    if (data) {
+                        const transformedData = data.map(item => ({
+                            label: item.expenseName,
+                            value: item.id,
+                            key: item.id.toString()
+                        }));
+                        setExpenseItemData(transformedData);
+                    }
+                } else {
+                    Toast.show({ type: "error", text1: "Error", text2: response?.message || "Failed to load ExpenseItems", position: "top", visibilityTime: 3000 });
                 }
             } catch (error) {
                 console.error('Error fetching ExpenseItems:', error);
@@ -220,7 +216,7 @@ const Expense = ({ palette: propPalette }) => {
         };
 
         getExpenseItemsByCategoryData();
-    }, [categoryValue, refreshFlag, id]);
+    }, [categoryValue, refreshFlag]);
 
     const handleImagePicker = () => {
         launchImageLibrary({
@@ -298,25 +294,27 @@ const Expense = ({ palette: propPalette }) => {
         try {
             setIsAddingExpense(true);
             const expenseData = {
-                id,
-                category: categoryValue,
-                expense_name: ExpenseItemValue,
+                categoryId: categoryValue,
+                expenseItemId: ExpenseItemValue,
                 cost,
-                p_date: purchaseDate,
+                pDate: purchaseDate,
                 description,
-                is_tax_app: isTaxApplicable ? "yes" : "no",
+                isTaxApp: isTaxApplicable ? "yes" : "no",
                 percentage: taxPercentage || "0",
-                tax_amount: taxAmount || "0",
+                taxAmount: taxAmount || "0",
                 image: selectedImage
             };
 
-            // Use the imported addExpense function from apiService
-            await addExpense(expenseData);
+            const response = await addExpense(expenseData);
 
-            Toast.show({
-                type: "success", text1: "Success", text2: "Expense added successfully", position: "top", visibilityTime: 3000, autoHide: true
-            });
-            handleClear();
+            if (response?.status) {
+                Toast.show({
+                    type: "success", text1: "Success", text2: response.message || "Expense added successfully", position: "top", visibilityTime: 3000, autoHide: true
+                });
+                handleClear();
+            } else {
+                Toast.show({ type: "error", text1: "Error", text2: response?.message || "Failed to add expense", position: "top" });
+            }
         } catch (error) {
             console.error('Error submitting expense:', error);
             Toast.show({ type: "error", text1: "Error", text2: "Failed to add expense", position: "top" });
@@ -325,210 +323,188 @@ const Expense = ({ palette: propPalette }) => {
         }
     };
 
+    const selectedCategoryName = categoryData.find((c) => c.value === categoryValue)?.label || '';
+    const isOthers = ['others', 'other', 'Other', 'OTHER', 'Others', 'OTHERS'].includes(selectedCategoryName);
+
     return (
         <>
             <LoaderSpinner shouldLoad={isAddingCategory || isAddingExpenseItem || isAddingExpense} />
             <ScrollView contentContainerStyle={styles.scrollContainer} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
-                <ThemedView style={styles.container}>
-                    <ThemedView style={styles.formContainer}>
-                        <View style={styles.rowContainer}>
-                            <View style={styles.flexItem}>
-                                <View style={styles.labelRow}>
-                                    <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Category :</ThemedText>
-                                    <TouchableOpacity onPress={() => setVisible(true)}>
-                                        <Icon name="add-circle" size={24} color="#4CAF50" />
-                                    </TouchableOpacity>
-                                </View>
-                                <DropDownPicker open={categoryOpen} value={categoryValue} items={categoryData}
-                                    setOpen={(isOpen) => {
-                                        setCategoryOpen(isOpen);
-                                        if (isOpen) setExpenseItemOpen(false);
-                                    }}
-                                    setValue={setCategoryValue} setItems={setCategoryData}
-                                    placeholder="Select Category"
-                                    style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                                    dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                                    textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
-                                    listMode="SCROLLVIEW"
-                                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
-                                />
-                            </View>
-
-                            <View style={styles.flexItem}>
-                                <View style={styles.labelRow}>
-                                    <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Expense Item :</ThemedText>
-                                    {categoryValue && (
-                                        <TouchableOpacity onPress={() => setExpenseItemVisible(true)}>
-                                            <Icon name="add-circle" size={24} color="#4CAF50" />
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                                {categoryValue === "others" || categoryValue === "other" || categoryValue === "Other" || categoryValue === "OTHER" || categoryValue === "Others" || categoryValue === "OTHERS" ? (
-                                    <ThemedTextInput placeholder="Enter Expense" value={ExpenseItemValue} onChangeText={setExpenseItemValue} style={styles.input} />
-                                ) : (
-                                    <DropDownPicker open={ExpenseItemOpen} value={ExpenseItemValue} items={ExpenseItemData}
-                                        setOpen={(isOpen) => {
-                                            setExpenseItemOpen(isOpen);
-                                            if (isOpen) setCategoryOpen(false);
-                                        }}
-                                        setValue={setExpenseItemValue} setItems={setExpenseItemData} placeholder="Select Expence"
-                                        style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                                        dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                                        textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
-                                        listMode="SCROLLVIEW"
-                                        theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
-                                    />
-                                )}
-                            </View>
-                        </View>
-
-                        <View style={styles.inputSection}>
-                            <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Amount (₹):</ThemedText>
-                            <ThemedTextInput placeholder="Enter Amount" value={cost} onChangeText={setCost} keyboardType="numeric" style={styles.input} />
-                        </View>
-
-                        <View style={styles.inputSection}>
-                            <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Date :</ThemedText>
-                            
-                            <TouchableOpacity onPress={() => setShowDatePicker(true)}
-                                style={[styles.dateButton, { borderColor: palette.savingBorder }]}
-                            >
-                                <ThemedText style={[styles.dateButtonText, { color: purchaseDate ? palette.savingText : palette.tabInactiveText }]}>
-                                    {purchaseDate || 'Select Date'}
-                                </ThemedText>
+                <View style={formStyles.row}>
+                    <View style={formStyles.flexItem}>
+                        <View style={formStyles.labelRow}>
+                            <ThemedText style={[formStyles.label, { color: palette.textSecondary, marginBottom: 0 }]}>Category :</ThemedText>
+                            <TouchableOpacity onPress={() => setVisible(true)}>
+                                <Icon name="add-circle" size={24} color={palette.primary} />
                             </TouchableOpacity>
-                            {showDatePicker && (
-                                <DateTimePicker
-                                    value={purchaseDate ? new Date(purchaseDate) : new Date()}
-                                    mode="date"
-                                    display="default"
-                                    onChange={handleDateChange}
-                                />
+                        </View>
+                        <FormDropdown
+                            open={categoryOpen} onOpenChange={setCategoryOpen}
+                            onOpened={() => setExpenseItemOpen(false)}
+                            value={categoryValue} onChange={setCategoryValue}
+                            items={categoryData} setItems={setCategoryData}
+                            placeholder="Select Category" palette={palette}
+                        />
+                    </View>
+
+                    <View style={formStyles.flexItem}>
+                        <View style={formStyles.labelRow}>
+                            <ThemedText style={[formStyles.label, { color: palette.textSecondary, marginBottom: 0 }]}>Expense Item :</ThemedText>
+                            {categoryValue && (
+                                <TouchableOpacity onPress={() => setExpenseItemVisible(true)}>
+                                    <Icon name="add-circle" size={24} color={palette.primary} />
+                                </TouchableOpacity>
                             )}
                         </View>
+                        {isOthers ? (
+                            <ThemedTextInput placeholder="Enter Expense" value={ExpenseItemValue} onChangeText={setExpenseItemValue} style={[formStyles.input, { borderColor: palette.fieldBorder }]} />
+                        ) : (
+                            <FormDropdown
+                                open={ExpenseItemOpen} onOpenChange={setExpenseItemOpen}
+                                onOpened={() => setCategoryOpen(false)}
+                                value={ExpenseItemValue} onChange={setExpenseItemValue}
+                                items={ExpenseItemData} setItems={setExpenseItemData}
+                                placeholder="Select Expence" palette={palette}
+                            />
+                        )}
+                    </View>
+                </View>
 
+                <View style={formStyles.fieldGroup}>
+                    <ThemedText style={[formStyles.label, { color: palette.textSecondary }]}>Amount (₹) :</ThemedText>
+                    <ThemedTextInput placeholder="Enter Amount" value={cost} onChangeText={setCost} keyboardType="numeric" style={[formStyles.input, { borderColor: palette.fieldBorder }]} />
+                </View>
 
-                        <View style={styles.inputSection}>
-                            <ThemedText style={styles.label}>Description(Optional) :</ThemedText>
-                            <ThemedTextAreaInput placeholder="Enter Description" value={description} onChangeText={setDescription} style={styles.textArea} />
+                <View style={formStyles.fieldGroup}>
+                    <ThemedText style={[formStyles.label, { color: palette.textSecondary }]}>Date :</ThemedText>
+                    <TouchableOpacity onPress={() => setShowDatePicker(true)}
+                        style={[formStyles.dateButton, { borderColor: palette.fieldBorder }]}
+                    >
+                        <ThemedText style={[formStyles.dateButtonText, { color: purchaseDate ? palette.textPrimary : palette.textSecondary }]}>
+                            {purchaseDate || 'Select Date'}
+                        </ThemedText>
+                    </TouchableOpacity>
+                    {showDatePicker && (
+                        <DateTimePicker
+                            value={purchaseDate ? new Date(purchaseDate) : new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={handleDateChange}
+                        />
+                    )}
+                </View>
+
+                <View style={formStyles.fieldGroup}>
+                    <ThemedText style={[formStyles.label, { color: palette.textSecondary }]}>Description (Optional) :</ThemedText>
+                    <ThemedTextAreaInput placeholder="Enter Description" value={description} onChangeText={setDescription} style={[formStyles.textArea, { borderColor: palette.fieldBorder }]} />
+                </View>
+
+                <View style={formStyles.fieldGroup}>
+                    <TouchableOpacity onPress={handleImagePicker} style={styles.imageButton}>
+                        <LinearGradient colors={['#1976D2', '#1565C0']} style={styles.imageButtonGradient}>
+                            <Icon name="photo-camera" size={24} color="#FFF" />
+                            <ThemedText style={styles.imageButtonText}>
+                                {selectedImage ? 'Change Image' : 'Add Image'}
+                            </ThemedText>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                    {selectedImage && (
+                        <Image source={{ uri: `data:image/jpeg;base64,${selectedImage}` }} style={styles.selectedImage} />
+                    )}
+                </View>
+
+                <View style={formStyles.fieldGroup}>
+                    <View style={styles.switchContainer}>
+                        <ThemedText style={[formStyles.label, { color: palette.textSecondary }]}>Tax Applicable :</ThemedText>
+                        <Switch value={isTaxApplicable} onValueChange={handleTaxToggle} trackColor={{ false: '#767577', true: '#81b0ff' }} thumbColor={isTaxApplicable ? '#1976D2' : '#f4f3f4'} />
+                    </View>
+
+                    {isTaxApplicable && (
+                        <View style={styles.taxDetails}>
+                            <ThemedTextInput placeholder="Enter Tax Percentage" value={taxPercentage} onChangeText={handleTaxPercentageChange} keyboardType="numeric" style={[formStyles.input, { borderColor: palette.fieldBorder }]} />
+                            <ThemedTextInput placeholder="Tax Amount" value={taxAmount} editable={false} style={[formStyles.input, styles.disabledInput, { borderColor: palette.fieldBorder }]}
+                            />
                         </View>
+                    )}
+                </View>
 
-                        <View style={styles.imageSection}>
-                            <TouchableOpacity onPress={handleImagePicker} style={styles.imageButton}>
-                                <LinearGradient colors={['#1976D2', '#1565C0']} style={styles.imageButtonGradient}>
-                                    <Icon name="photo-camera" size={24} color="#FFF" />
-                                    <ThemedText style={styles.imageButtonText}>
-                                        {selectedImage ? 'Change Image' : 'Add Image'}
-                                    </ThemedText>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                            {selectedImage && (
-                                <Image source={{ uri: `data:image/jpeg;base64,${selectedImage}` }} style={styles.selectedImage} />
-                            )}
-                        </View>
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
+                        <LinearGradient colors={['#64748b', '#475569']} style={formStyles.buttonGradient}>
+                            <ThemedText style={styles.buttonText}>Clear</ThemedText>
+                        </LinearGradient>
+                    </TouchableOpacity>
 
-                        <View style={styles.taxSection}>
-                            <View style={styles.switchContainer}>
-                                <ThemedText style={[styles.label, { color: palette.textSecondary }]}>Tax Applicable :</ThemedText>
-                                <Switch value={isTaxApplicable} onValueChange={handleTaxToggle} trackColor={{ false: '#767577', true: '#81b0ff' }} thumbColor={isTaxApplicable ? '#1976D2' : '#f4f3f4'} />
-                            </View>
-
-                            {isTaxApplicable && (
-                                <View style={styles.taxDetails}>
-                                    <ThemedTextInput placeholder="Enter Tax Percentage" value={taxPercentage} onChangeText={handleTaxPercentageChange} keyboardType="numeric" style={styles.input} />
-                                    <ThemedTextInput placeholder="Tax Amount" value={taxAmount} editable={false} style={[styles.input, styles.disabledInput]}
-                                    />
-                                </View>
-                            )}
-                        </View>
-
-                        <View style={styles.buttonContainer}>
-                            <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
-                                <LinearGradient colors={['#757575', '#616161']} style={styles.buttonGradient}>
-                                    <ThemedText style={styles.buttonText}>Clear</ThemedText>
-                                </LinearGradient>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity onPress={handleSubmit} style={styles.submitButton}>
-                                <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                                    <ThemedText style={styles.buttonText}>Submit</ThemedText>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        </View>
-                    </ThemedView>
-                </ThemedView>
+                    <TouchableOpacity onPress={handleSubmit} style={styles.submitButton}>
+                        <LinearGradient colors={['#4CAF50', '#2E7D32']} style={formStyles.buttonGradient}>
+                            <ThemedText style={styles.buttonText}>Submit</ThemedText>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
             </ScrollView>
             <Toast />
 
             {/* Add Category Modal */}
-            <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={hideAddCategoryDialog}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
-                        <ThemedView style={styles.modalContent}>
-                            <ThemedText style={styles.modalTitle}>Add New Category</ThemedText>
-                            <ThemedView style={styles.inputContainer}>
-                                <ThemedText style={[styles.modalLabel, { color: palette.textSecondary }]}>Category Name:</ThemedText>
-                                <ThemedTextInput placeholder="Enter Category Name" value={newCategory}
-                                    onChangeText={setNewCategory} style={styles.modalInput} />
-                            </ThemedView>
+            <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={hideAddCategoryDialog}>
+                <View style={[styles.modalOverlay, { backgroundColor: palette.glassOverlay }]}>
+                    <View style={[styles.modalContainer, { backgroundColor: palette.glassContainer, borderColor: palette.glassBorder }]}>
+                        <ThemedText style={[styles.modalTitle, { color: palette.textPrimary }]}>Add New Category</ThemedText>
+                        <View style={styles.inputContainer}>
+                            <ThemedText style={[styles.modalLabel, { color: palette.textSecondary }]}>Category Name:</ThemedText>
+                            <ThemedTextInput placeholder="Enter Category Name" value={newCategory}
+                                onChangeText={setNewCategory} style={[styles.modalInput, { borderColor: palette.fieldBorder }]} />
+                        </View>
 
-                            <View style={styles.modalButtonContainer}>
-                                <TouchableOpacity onPress={hideAddCategoryDialog} style={styles.modalButton}>
-                                    <LinearGradient colors={['#757575', '#616161']} style={styles.buttonGradient}>
-                                        <ThemedText style={styles.buttonText}>Close</ThemedText>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={handleCategorySubmit} style={styles.modalButton}>
-                                    <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                                        <ThemedText style={styles.buttonText}>Add </ThemedText>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-                        </ThemedView>
+                        <View style={styles.modalButtonContainer}>
+                            <TouchableOpacity onPress={hideAddCategoryDialog} style={styles.modalButton}>
+                                <LinearGradient colors={['#64748b', '#475569']} style={formStyles.buttonGradient}>
+                                    <ThemedText style={styles.buttonText}>Close</ThemedText>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleCategorySubmit} style={styles.modalButton}>
+                                <LinearGradient colors={['#4CAF50', '#2E7D32']} style={formStyles.buttonGradient}>
+                                    <ThemedText style={styles.buttonText}>Add</ThemedText>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
 
             {/* Add ExpenseItem Modal */}
-            <Modal animationType="slide" transparent={true} visible={ExpenseItemVisible} onRequestClose={hideaddExpenseItemDialog}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
-                        <ThemedView style={styles.modalContent}>
-                            <ThemedText style={styles.modalTitle}>Add Expence Item</ThemedText>
+            <Modal animationType="fade" transparent={true} visible={ExpenseItemVisible} onRequestClose={hideaddExpenseItemDialog}>
+                <View style={[styles.modalOverlay, { backgroundColor: palette.glassOverlay }]}>
+                    <View style={[styles.modalContainer, { backgroundColor: palette.glassContainer, borderColor: palette.glassBorder }]}>
+                        <ThemedText style={[styles.modalTitle, { color: palette.textPrimary }]}>Add Expense Item</ThemedText>
 
-                            <ThemedView style={styles.inputContainer}>
-                                <ThemedText style={[styles.modalLabel, { color: palette.textSecondary }]}>Category:</ThemedText>
-                                <DropDownPicker open={categoryOpen} value={categoryValue} items={categoryData}
-                                    setOpen={setCategoryOpen} setValue={setCategoryValue} setItems={setCategoryData}
-                                    placeholder="Select Category"
-                                    style={[styles.picker, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                                    dropDownContainerStyle={[styles.dropdownList, { borderColor: palette.cardBorder, backgroundColor: palette.background }]}
-                                    textStyle={[styles.dropdownText, { color: palette.textPrimary }]}
-                                    listMode="SCROLLVIEW"
-                                    disabled={true}
-                                    theme={theme === 'dark' ? 'DARK' : 'LIGHT'}
-                                />
-                            </ThemedView>
+                        <View style={styles.inputContainer}>
+                            <ThemedText style={[styles.modalLabel, { color: palette.textSecondary }]}>Category:</ThemedText>
+                            <FormDropdown
+                                open={categoryOpen} onOpenChange={setCategoryOpen}
+                                value={categoryValue} onChange={setCategoryValue}
+                                items={categoryData} setItems={setCategoryData}
+                                placeholder="Select Category" palette={palette} disabled
+                            />
+                        </View>
 
-                            <ThemedView style={styles.inputContainer}>
-                                <ThemedText style={[styles.modalLabel, { color: palette.textSecondary }]}>Expence Item Name:</ThemedText>
-                                <ThemedTextInput placeholder="Enter Expense Item Name" value={newExpenseItem} onChangeText={setNewExpenseItem} style={styles.modalInput}
-                                />
-                            </ThemedView>
+                        <View style={styles.inputContainer}>
+                            <ThemedText style={[styles.modalLabel, { color: palette.textSecondary }]}>Expense Item Name:</ThemedText>
+                            <ThemedTextInput placeholder="Enter Expense Item Name" value={newExpenseItem} onChangeText={setNewExpenseItem} style={[styles.modalInput, { borderColor: palette.fieldBorder }]}
+                            />
+                        </View>
 
-                            <View style={styles.modalButtonContainer}>
-                                <TouchableOpacity onPress={hideaddExpenseItemDialog} style={styles.modalButton}>
-                                    <LinearGradient colors={['#757575', '#616161']} style={styles.buttonGradient}>
-                                        <ThemedText style={styles.buttonText}>Close</ThemedText>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={handleExpenseItemSubmit} style={styles.modalButton}>
-                                    <LinearGradient colors={['#4CAF50', '#2E7D32']} style={styles.buttonGradient}>
-                                        <ThemedText style={styles.buttonText}>Add</ThemedText>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-                        </ThemedView>
+                        <View style={styles.modalButtonContainer}>
+                            <TouchableOpacity onPress={hideaddExpenseItemDialog} style={styles.modalButton}>
+                                <LinearGradient colors={['#64748b', '#475569']} style={formStyles.buttonGradient}>
+                                    <ThemedText style={styles.buttonText}>Close</ThemedText>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleExpenseItemSubmit} style={styles.modalButton}>
+                                <LinearGradient colors={['#4CAF50', '#2E7D32']} style={formStyles.buttonGradient}>
+                                    <ThemedText style={styles.buttonText}>Add</ThemedText>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -540,79 +516,13 @@ const styles = StyleSheet.create({
     scrollContainer: {
         flexGrow: 1,
     },
-    container: {
-        flex: 1,
-    },
-    formContainer: {
-        padding: 2,
-    },
-    rowContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-        gap: 15,
-    },
-    flexItem: {
-        flex: 1,
-    },
-    labelRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: '500',
-        marginBottom: 2,
-    },
-    inputSection: {
-        marginBottom: 20,
-    },
-    input: {
-        height: 45,
-        borderRadius: 8,
-        marginBottom: 0,
-    },
-    picker: {
-        borderWidth: 1,
-        borderRadius: 12,
-        height: 48,
-    },
-    dropdownList: {
-        borderWidth: 1,
-        borderRadius: 12,
-        maxHeight: 300,
-    },
-    dropdownText: {
-        fontSize: 15,
-    },
-    textArea: {
-        height: 100,
-        borderRadius: 8,
-        textAlignVertical: 'top',
-        marginBottom: 0,
-    },
-    dateButton: {
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderWidth: 1,
-        borderRadius: 50,
-        marginBottom: 2,
-        borderColor: "white"
-    },
-    dateButtonText: {
-        fontSize: 15,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
     imageButton: {
         marginBottom: 16,
     },
     imageButtonGradient: {
         flexDirection: 'row',
         padding: 15,
-        borderRadius: 8,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -624,11 +534,8 @@ const styles = StyleSheet.create({
     selectedImage: {
         width: '100%',
         height: 200,
-        borderRadius: 8,
+        borderRadius: 10,
         marginBottom: 16,
-    },
-    taxSection: {
-        marginBottom: 20,
     },
     switchContainer: {
         flexDirection: 'row',
@@ -641,25 +548,17 @@ const styles = StyleSheet.create({
     },
     disabledInput: {
         backgroundColor: 'transparent',
-        color: '#666',
     },
     buttonContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        gap: 12,
         marginTop: 10,
     },
     clearButton: {
         flex: 1,
-        marginRight: 8,
     },
     submitButton: {
         flex: 1,
-        marginLeft: 8,
-    },
-    buttonGradient: {
-        padding: 15,
-        borderRadius: 8,
-        alignItems: 'center',
     },
     buttonText: {
         color: '#FFF',
@@ -668,55 +567,47 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(190, 189, 189, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    modalContainer: {
-        height: 400,
-        maxHeight: 800,
-        width: '90%',
-        elevation: 5,
-        borderWidth: 1,
-        borderColor: '#ccc',
-    },
-    modalContent: {
-        flex: 1,
         padding: 20,
     },
+    modalContainer: {
+        width: '100%',
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        padding: 24,
+    },
     modalTitle: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: 'bold',
         marginBottom: 20,
         textAlign: 'center',
     },
     inputContainer: {
-        flex: 1,
         width: '100%',
-        // marginBottom: 20,
+        marginBottom: 12,
     },
     modalLabel: {
         fontSize: 16,
-        // marginBottom: 8,
         fontWeight: '500',
+        marginBottom: 8,
     },
     modalInput: {
         width: '100%',
-        borderColor: '#ccc',
         borderWidth: 1,
-        borderRadius: 8,
-        padding: 10,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        marginVertical: 0,
     },
     modalButtonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingHorizontal: 10,
-        paddingBottom: 20,
-        marginTop: 10,
+        gap: 12,
+        paddingTop: 10,
     },
     modalButton: {
         flex: 1,
-        marginHorizontal: 5,
     },
 });
 

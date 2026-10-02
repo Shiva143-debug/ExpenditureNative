@@ -1,14 +1,14 @@
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedView from './ThemedView';
 import ThemedText from './ThemedText';
-import { ThemeContext } from '../context/ThemeContext';
+import { useTheme } from '../theme/useTheme';
 
 
 
 const Footer = ({ state, descriptors, navigation }) => {
-  const { theme } = useContext(ThemeContext);
+  const { theme } = useTheme();
   const translateY = useRef(new Animated.Value(84)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -33,7 +33,6 @@ const Footer = ({ state, descriptors, navigation }) => {
   const borderColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.24)' : 'rgba(15, 23, 42, 0.08)';
   const tabBackground = theme === 'dark' ? 'rgba(56, 189, 248, 0.22)' : 'rgba(37, 99, 235, 0.12)';
   const addBackground = theme === 'dark' ? '#1f2937' : '#dbeafe';
-
   return (
     <Animated.View style={[styles.animatedWrapper, { opacity, transform: [{ translateY }] }]}>
       <ThemedView style={[styles.footerContainer, { backgroundColor: footerBackground, borderTopColor: borderColor }] }>
